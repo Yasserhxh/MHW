@@ -4,11 +4,14 @@ import { router } from './router';
 import { useAuthStore } from '../features/auth/store/auth.store';
 import { useNotificationRealtime } from '../features/notifications/hooks/useNotificationRealtime';
 
-function RealtimeBootstrap() {
-  const token = useAuthStore((s) => s.accessToken);
-  useNotificationRealtime(Boolean(token));
-  return null;
-}
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 30_000,
+    },
+  },
+});
 
 export default function App() {
   return (
