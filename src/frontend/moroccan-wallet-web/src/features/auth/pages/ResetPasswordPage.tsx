@@ -1,56 +1,27 @@
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { AuthCard } from '../components/AuthCard';
 import { authApi } from '../api/auth.api';
+import { useAuthSubmit } from '../hooks/useAuthSubmit';
 
 export default function ResetPasswordPage() {
-  const [searchParams] = useSearchParams();
-  const [token, setToken] = useState(searchParams.get('token') ?? '');
+  const [email, setEmail] = useState('');
+  const [token, setToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      await authApi.resetPassword(token, newPassword);
-      navigate('/login');
-    } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { detail?: string } } };
-      setError(axiosError.response?.data?.detail ?? 'Reset failed. Token may be expired.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { loading, error, success, run } = useAuthSubmit(authApi.resetPassword);
 
   return (
-    <div style={{ maxWidth: 400, margin: '80px auto', padding: 24 }}>
-      <h2>Set new password</h2>
-      <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Reset token"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          required
-          style={{ display: 'block', width: '100%', marginBottom: 12 }}
-        />
-        <input
-          type="password"
-          placeholder="New password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          required
-          minLength={8}
-          style={{ display: 'block', width: '100%', marginBottom: 12 }}
-        />
-        {error && <p style={{ color: 'red' }}>{error}</p>}
-        <button type="submit" disabled={loading}>
-          {loading ? 'Resetting...' : 'Reset password'}
-        </button>
+    <AuthCard title="Reset password" subtitle="Enter your reset token and new password.">
+      <form className="form-grid" onSubmit={(e) => {
+        e.preventDefault();
+        run({ email, token, newPassword }, 'Password reset successful. You can sign in now.');
+      }}>
+        <input className="input" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input className="input" placeholder="Reset token" value={token} onChange={(e) => setToken(e.target.value)} />
+        <input className="input" type="password" placeholder="New password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+        {error ? <span style={{ color: 'var(--danger)' }}>{error}</span> : null}
+        {success ? <span style={{ color: 'var(--success)' }}>{success}</span> : null}
+        <button className="btn btn-primary" disabled={loading}>{loading ? 'Resetting...' : 'Reset password'}</button>
       </form>
-    </div>
+    </AuthCard>
   );
 }

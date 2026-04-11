@@ -1,53 +1,31 @@
-import { useEffect } from 'react';
-import { useAuthStore } from '../../auth/store/auth.store';
-import { startNotificationConnection, getNotificationConnection } from '../../../lib/signalr';
+import { AppPageHeader } from '../../../shared/components/AppPageHeader';
+import { QuickAddButton } from '../../../shared/components/common';
+import { SectionCard } from '../../../shared/components/SectionCard';
+import { StatCard } from '../../../shared/components/StatCard';
+import { TransactionList } from '../../../shared/components/TransactionList';
+import { ReminderList } from '../../../shared/components/ReminderList';
+
+const recentTransactions = [
+  { id: '1', title: 'Carrefour Market', category: 'Groceries', amount: 265, date: 'Apr 09', status: 'paid' as const },
+  { id: '2', title: 'Electricity Bill', category: 'Utilities', amount: 410, date: 'Apr 12', status: 'upcoming' as const },
+];
 
 export default function DashboardPage() {
-  const { email, clearAuth, accessToken, refreshToken } = useAuthStore();
-
-  useEffect(() => {
-    if (!accessToken) return;
-
-    startNotificationConnection().catch(console.error);
-
-    const conn = getNotificationConnection();
-    conn.on('ReceiveNotification', (notification) => {
-      console.log('New notification:', notification);
-      // TODO: push to notifications store
-    });
-
-    return () => {
-      conn.off('ReceiveNotification');
-    };
-  }, [accessToken]);
-
-  const handleLogout = async () => {
-    if (refreshToken && accessToken) {
-      try {
-        const { authApi } = await import('../../auth/api/auth.api');
-        await authApi.logout(refreshToken, accessToken);
-      } catch {
-        // Continue with local logout regardless
-      }
-    }
-    clearAuth();
-  };
-
   return (
-    <div style={{ padding: 24 }}>
-      <h1>Moroccan Wallet</h1>
-      <p>Welcome, {email}</p>
-      <nav>
-        <ul>
-          <li>Transactions (coming soon)</li>
-          <li>Wallets (coming soon)</li>
-          <li>Shared Expenses (coming soon)</li>
-          <li>Grocery Prices (coming soon)</li>
-          <li>Reminders (coming soon)</li>
-          <li>Notifications (coming soon)</li>
-        </ul>
-      </nav>
-      <button onClick={handleLogout}>Logout</button>
+    <div className="page-grid">
+      <AppPageHeader title="Dashboard" subtitle="Your household finances at a glance." action={<QuickAddButton />} />
+      <div className="grid-4">
+        <StatCard label="Month spent" value="MAD 4,890" tone="warning" />
+        <StatCard label="Budget remaining" value="MAD 2,110" tone="success" />
+        <StatCard label="Upcoming bills" value="3" tone="warning" />
+        <StatCard label="Household balance" value="MAD -340" tone="danger" />
+      </div>
+      <div className="grid-2">
+        <SectionCard title="Recent transactions"><TransactionList items={recentTransactions} /></SectionCard>
+        <SectionCard title="Upcoming reminders"><ReminderList items={[{ id: '1', title: 'Internet', dueDate: 'Apr 14', status: 'upcoming' }, { id: '2', title: 'Rent split', dueDate: 'Apr 16', status: 'overdue' }]} /></SectionCard>
+        <SectionCard title="Shared activity"><div className="list"><div className="list-item"><span>Youssef added Water Bill</span><span>MAD 180</span></div><div className="list-item"><span>Amina settled groceries</span><span>MAD 220</span></div></div></SectionCard>
+        <SectionCard title="Grocery updates & latest notifications"><div className="list"><div className="list-item"><span>Olive oil dropped to MAD 62</span><span>Marjane</span></div><div className="list-item"><span>Reminder: Electricity due in 2 days</span><span>now</span></div></div></SectionCard>
+      </div>
     </div>
   );
 }
