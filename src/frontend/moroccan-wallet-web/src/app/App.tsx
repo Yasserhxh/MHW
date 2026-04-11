@@ -1,21 +1,20 @@
 import { RouterProvider } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AppProviders } from './providers/AppProviders';
 import { router } from './router';
+import { useAuthStore } from '../features/auth/store/auth.store';
+import { useNotificationRealtime } from '../features/notifications/hooks/useNotificationRealtime';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      staleTime: 30_000,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+function RealtimeBootstrap() {
+  const token = useAuthStore((s) => s.accessToken);
+  useNotificationRealtime(Boolean(token));
+  return null;
+}
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <AppProviders>
+      <RealtimeBootstrap />
       <RouterProvider router={router} />
-    </QueryClientProvider>
+    </AppProviders>
   );
 }

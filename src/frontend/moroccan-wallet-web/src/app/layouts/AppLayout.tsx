@@ -6,6 +6,15 @@ import { Topbar } from './components/Topbar';
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+const navItems = [
+  ['Dashboard', '/dashboard'],
+  ['Expenses', '/expenses'],
+  ['Shared Expenses', '/shared-expenses'],
+  ['Grocery Prices', '/grocery-prices'],
+  ['Reminders', '/reminders'],
+  ['Notifications', '/notifications'],
+  ['Settings', '/settings/profile'],
+] as const;
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
@@ -23,7 +32,23 @@ export default function AppLayout() {
           >
             <div className="fixed inset-0 bg-black/50" />
           </Transition.Child>
+export function AppLayout() {
+  const unread = useNotificationsStore((s) => s.unreadCount);
+  const location = useLocation();
+  const email = useAuthStore((s) => s.email);
 
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <h2>Moroccan Household Wallet</h2>
+        {navItems.map(([label, to]) => (
+          <NavLink key={to} className="nav-link" to={to}>{label}</NavLink>
+        ))}
+      </aside>
+      <div className="content">
+        <header className="topbar">
+          <div>
+            <strong>{location.pathname.split('/').filter(Boolean).join(' / ') || 'dashboard'}</strong>
           <div className="fixed inset-0 flex">
             <Transition.Child
               as={Fragment}
@@ -45,7 +70,7 @@ export default function AppLayout() {
       {/* Desktop sidebar — always visible */}
       <div className="hidden lg:flex flex-shrink-0">
         <Sidebar />
-      </div>
+          </div>
 
       {/* Main area */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
@@ -53,8 +78,8 @@ export default function AppLayout() {
 
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <Outlet />
-          </div>
+        <Outlet />
+      </div>
         </main>
       </div>
     </div>
