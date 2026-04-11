@@ -14,7 +14,8 @@
       "Bash(dotnet-script --version)",
       "Bash(powershell -Command '[System.Reflection.Assembly]::LoadFile\\('\\\\''__TRACKED_VAR__/Microsoft.OpenApi.dll'\\\\''\\).GetExportedTypes\\(\\) | Select-Object -First 30 | ForEach-Object { $_.FullName }')",
       "Bash(powershell:*)",
-      "Bash(node -e \"const z = require\\('./node_modules/zod'\\); console.log\\(z.version ?? require\\('./node_modules/zod/package.json'\\).version\\)\")"
+      "Bash(node -e \"const z = require\\('./node_modules/zod'\\); console.log\\(z.version ?? require\\('./node_modules/zod/package.json'\\).version\\)\")",
+      "Bash(npm run:*)"
     ]
   }
 }
