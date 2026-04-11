@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet --version)",
+      "Bash(dotnet sdk:*)",
+      "Bash(dotnet:*)",
+      "Bash(grep -v \"^$\")",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(xargs grep:*)",
+      "Bash(xargs sed:*)",
+      "Bash(echo \"EXIT:$?\")",
+      "Read(//c/Users/YasserBOUAABANE/.nuget/packages/microsoft.openapi/3.5.1/lib/net8.0/**)",
+      "Bash(dotnet-script --version)",
+      "Bash(powershell -Command '[System.Reflection.Assembly]::LoadFile\\('\\\\''__TRACKED_VAR__/Microsoft.OpenApi.dll'\\\\''\\).GetExportedTypes\\(\\) | Select-Object -First 30 | ForEach-Object { $_.FullName }')",
+      "Bash(powershell:*)"
+    ]
+  }
+}

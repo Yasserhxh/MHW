@@ -1,0 +1,47 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: src/backend/Host/MoroccanWallet.Host/Dockerfile
+    container_name: moroccan_wallet_api
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__Default=Host=postgres;Port=5432;Database=moroccan_wallet;Username=postgres;Password=${POSTGRES_PASSWORD}
+      - Jwt__SecretKey=${JWT_SECRET_KEY}
+      - Jwt__Issuer=moroccan-wallet-api
+      - Jwt__Audience=moroccan-wallet-clients
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - wallet_network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:18.3
+    container_name: moroccan_wallet_db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: moroccan_wallet
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wallet_network
+    restart: unless-stopped
+
+networks:
+  wallet_network:
+    driver: bridge
+
+volumes:
+  postgres_data:

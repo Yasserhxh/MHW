@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="FluentValidation" Version="12.1.1" />
+    <PackageReference Include="MailKit" Version="4.11.0" />
+    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.5">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.5" />
+    <PackageReference Include="Microsoft.OpenApi" Version="3.5.1" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.13.22" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Serilog.Enrichers.CorrelationId" Version="3.0.1" />
+    <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+    <PackageReference Include="Serilog.Enrichers.Thread" Version="4.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\MoroccanWallet.Shared.Kernel\MoroccanWallet.Shared.Kernel.csproj" />
+    <ProjectReference Include="..\..\Shared\MoroccanWallet.Shared.Infrastructure\MoroccanWallet.Shared.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Identity\MoroccanWallet.Modules.Identity\MoroccanWallet.Modules.Identity.csproj" />
+    <ProjectReference Include="..\..\Modules\Users\MoroccanWallet.Modules.Users\MoroccanWallet.Modules.Users.csproj" />
+    <ProjectReference Include="..\..\Modules\HouseholdBudget\MoroccanWallet.Modules.HouseholdBudget\MoroccanWallet.Modules.HouseholdBudget.csproj" />
+    <ProjectReference Include="..\..\Modules\SharedExpenses\MoroccanWallet.Modules.SharedExpenses\MoroccanWallet.Modules.SharedExpenses.csproj" />
+    <ProjectReference Include="..\..\Modules\GroceryPrices\MoroccanWallet.Modules.GroceryPrices\MoroccanWallet.Modules.GroceryPrices.csproj" />
+    <ProjectReference Include="..\..\Modules\Reminders\MoroccanWallet.Modules.Reminders\MoroccanWallet.Modules.Reminders.csproj" />
+    <ProjectReference Include="..\..\Modules\Notifications\MoroccanWallet.Modules.Notifications\MoroccanWallet.Modules.Notifications.csproj" />
+    <ProjectReference Include="..\..\Modules\ReferenceData\MoroccanWallet.Modules.ReferenceData\MoroccanWallet.Modules.ReferenceData.csproj" />
+    <ProjectReference Include="..\..\Modules\Administration\MoroccanWallet.Modules.Administration\MoroccanWallet.Modules.Administration.csproj" />
+  </ItemGroup>
+
+</Project>

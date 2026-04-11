@@ -1,0 +1,40 @@
+<Solution>
+  <Folder Name="/Host/">
+    <Project Path="Host/MoroccanWallet.Host/MoroccanWallet.Host.csproj" />
+  </Folder>
+  <Folder Name="/Modules/" />
+  <Folder Name="/Modules/Administration/">
+    <Project Path="Modules/Administration/MoroccanWallet.Modules.Administration/MoroccanWallet.Modules.Administration.csproj" />
+  </Folder>
+  <Folder Name="/Modules/GroceryPrices/">
+    <Project Path="Modules/GroceryPrices/MoroccanWallet.Modules.GroceryPrices/MoroccanWallet.Modules.GroceryPrices.csproj" />
+  </Folder>
+  <Folder Name="/Modules/HouseholdBudget/">
+    <Project Path="Modules/HouseholdBudget/MoroccanWallet.Modules.HouseholdBudget/MoroccanWallet.Modules.HouseholdBudget.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Identity/">
+    <Project Path="Modules/Identity/MoroccanWallet.Modules.Identity/MoroccanWallet.Modules.Identity.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Notifications/">
+    <Project Path="Modules/Notifications/MoroccanWallet.Modules.Notifications/MoroccanWallet.Modules.Notifications.csproj" />
+  </Folder>
+  <Folder Name="/Modules/ReferenceData/">
+    <Project Path="Modules/ReferenceData/MoroccanWallet.Modules.ReferenceData/MoroccanWallet.Modules.ReferenceData.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Reminders/">
+    <Project Path="Modules/Reminders/MoroccanWallet.Modules.Reminders/MoroccanWallet.Modules.Reminders.csproj" />
+  </Folder>
+  <Folder Name="/Modules/SharedExpenses/">
+    <Project Path="Modules/SharedExpenses/MoroccanWallet.Modules.SharedExpenses/MoroccanWallet.Modules.SharedExpenses.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Users/">
+    <Project Path="Modules/Users/MoroccanWallet.Modules.Users/MoroccanWallet.Modules.Users.csproj" />
+  </Folder>
+  <Folder Name="/Shared/">
+    <Project Path="Shared/MoroccanWallet.Shared.Infrastructure/MoroccanWallet.Shared.Infrastructure.csproj" />
+    <Project Path="Shared/MoroccanWallet.Shared.Kernel/MoroccanWallet.Shared.Kernel.csproj" />
+  </Folder>
+  <Project Path="../../tests/MoroccanWallet.Tests.Architecture/MoroccanWallet.Tests.Architecture.csproj" />
+  <Project Path="../../tests/MoroccanWallet.Tests.Integration/MoroccanWallet.Tests.Integration.csproj" />
+  <Project Path="../../tests/MoroccanWallet.Tests.Unit/MoroccanWallet.Tests.Unit.csproj" />
+</Solution>

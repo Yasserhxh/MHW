@@ -1,0 +1,18 @@
+services:
+  api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__Default=Host=postgres;Port=5432;Database=moroccan_wallet_dev;Username=postgres;Password=postgres
+      - Jwt__SecretKey=dev-only-secret-key-minimum-256-bits-change-this
+      - Jwt__Issuer=moroccan-wallet-api-dev
+      - Jwt__Audience=moroccan-wallet-clients
+      - Email__Provider=dev
+    ports:
+      - "8080:8080"
+
+  postgres:
+    environment:
+      POSTGRES_DB: moroccan_wallet_dev
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
