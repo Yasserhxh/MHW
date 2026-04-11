@@ -5,7 +5,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using MoroccanWallet.Modules.Administration;
 using MoroccanWallet.Modules.GroceryPrices;
 using MoroccanWallet.Modules.HouseholdBudget;
@@ -60,7 +60,7 @@ try
                 Description = "Production-grade household wallet management API"
             };
 
-            // Bearer security scheme
+            // Bearer security scheme (Microsoft.OpenApi 2.0 API)
             doc.Components ??= new OpenApiComponents();
             doc.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
             {
@@ -69,18 +69,11 @@ try
                 BearerFormat = "JWT",
                 Description = "Enter JWT access token"
             };
-            doc.SecurityRequirements.Add(new OpenApiSecurityRequirement
+            doc.Security.Add(new OpenApiSecurityRequirement
             {
                 {
-                    new OpenApiSecurityScheme
-                    {
-                        Reference = new OpenApiReference
-                        {
-                            Type = ReferenceType.SecurityScheme,
-                            Id = "Bearer"
-                        }
-                    },
-                    Array.Empty<string>()
+                    new OpenApiSecuritySchemeReference("Bearer", doc),
+                    new List<string>()
                 }
             });
 
