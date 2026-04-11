@@ -39,11 +39,14 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'mw-auth',
-      // Only persist refreshToken and userId (not accessToken — kept in memory)
+      // Persist auth state so page reload keeps session.
+      // accessToken is NOT persisted (memory-only); on reload the interceptor
+      // will refresh it automatically using the stored refreshToken.
       partialize: (state) => ({
         refreshToken: state.refreshToken,
         userId: state.userId,
         email: state.email,
+        isAuthenticated: state.isAuthenticated,
       }),
     }
   )
