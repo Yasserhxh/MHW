@@ -1,56 +1,25 @@
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { AuthCard } from '../components/AuthCard';
 import { authApi } from '../api/auth.api';
+import { useAuthSubmit } from '../hooks/useAuthSubmit';
 
 export default function VerifyEmailPage() {
-  const [searchParams] = useSearchParams();
-  const [token, setToken] = useState(searchParams.get('token') ?? '');
-  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await authApi.verifyEmail(token);
-      setStatus('success');
-    } catch {
-      setStatus('error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (status === 'success') {
-    return (
-      <div style={{ maxWidth: 400, margin: '80px auto', padding: 24 }}>
-        <h2>Email verified</h2>
-        <p>Your email has been verified. You can now log in.</p>
-        <button onClick={() => navigate('/login')}>Go to Login</button>
-      </div>
-    );
-  }
+  const [email, setEmail] = useState('');
+  const [token, setToken] = useState('');
+  const { loading, error, success, run } = useAuthSubmit(authApi.verifyEmail);
 
   return (
-    <div style={{ maxWidth: 400, margin: '80px auto', padding: 24 }}>
-      <h2>Verify your email</h2>
-      <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Verification token"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          required
-          style={{ display: 'block', width: '100%', marginBottom: 12 }}
-        />
-        {status === 'error' && (
-          <p style={{ color: 'red' }}>Invalid or expired token.</p>
-        )}
-        <button type="submit" disabled={loading}>
-          {loading ? 'Verifying...' : 'Verify email'}
-        </button>
+    <AuthCard title="Verify email" subtitle="Confirm your email to activate your account.">
+      <form className="form-grid" onSubmit={(e) => {
+        e.preventDefault();
+        run({ email, token }, 'Email successfully verified.');
+      }}>
+        <input className="input" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input className="input" placeholder="Verification token" value={token} onChange={(e) => setToken(e.target.value)} />
+        {error ? <span style={{ color: 'var(--danger)' }}>{error}</span> : null}
+        {success ? <span style={{ color: 'var(--success)' }}>{success}</span> : null}
+        <button className="btn btn-primary" disabled={loading}>{loading ? 'Verifying...' : 'Verify email'}</button>
       </form>
-    </div>
+    </AuthCard>
   );
 }

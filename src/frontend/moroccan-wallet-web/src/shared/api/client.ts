@@ -1,71 +1,63 @@
-import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
-import { useAuthStore } from '../../features/auth/store/auth.store';
+import axios, { type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
+import { authStore } from '../../features/auth/store/auth.store';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
 
 export const apiClient: AxiosInstance = axios.create({
-  baseURL: `${BASE_URL}/api/v1`,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: `${API_URL}/api/v1`,
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Attach access token from in-memory store on every request
-apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = useAuthStore.getState().accessToken;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
+
+apiClient.interceptors.request.use((config) => {
+  const token = authStore.getState().accessToken;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// Auto-refresh on 401
-let isRefreshing = false;
-let refreshQueue: Array<(token: string) => void> = [];
+let refreshing = false;
+let queue: Array<(token: string) => void> = [];
 
 apiClient.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-
-    if (error.response?.status !== 401 || originalRequest._retry) {
+  async (error: AxiosError) => {
+    const original = error.config as RetriableConfig | undefined;
+    if (!original || error.response?.status !== 401 || original._retry) {
       return Promise.reject(error);
     }
 
-    originalRequest._retry = true;
+    original._retry = true;
 
-    if (isRefreshing) {
+    if (refreshing) {
       return new Promise((resolve) => {
-        refreshQueue.push((token: string) => {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          resolve(apiClient(originalRequest));
+        queue.push((token: string) => {
+          original.headers.Authorization = `Bearer ${token}`;
+          resolve(apiClient(original));
         });
       });
     }
 
-    isRefreshing = true;
+    refreshing = true;
 
     try {
-      const refreshToken = useAuthStore.getState().refreshToken;
-      if (!refreshToken) throw new Error('No refresh token');
+      const refreshToken = authStore.getState().refreshToken;
+      if (!refreshToken) throw new Error('Missing refresh token');
 
-      const { data } = await axios.post(`${BASE_URL}/api/v1/auth/refresh`, {
-        refreshToken,
-      });
+      const { data } = await axios.post<{ accessToken: string; refreshToken: string }>(`${API_URL}/api/v1/auth/refresh`, { refreshToken });
+      authStore.getState().setTokens(data.accessToken, data.refreshToken);
 
-      useAuthStore.getState().setTokens(data.accessToken, data.refreshToken);
+      queue.forEach((resolve) => resolve(data.accessToken));
+      queue = [];
 
-      refreshQueue.forEach((cb) => cb(data.accessToken));
-      refreshQueue = [];
-
-      originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
-      return apiClient(originalRequest);
-    } catch {
-      useAuthStore.getState().clearAuth();
+      original.headers.Authorization = `Bearer ${data.accessToken}`;
+      return apiClient(original);
+    } catch (refreshError) {
+      authStore.getState().clearAuth();
       window.location.href = '/login';
-      return Promise.reject(error);
+      return Promise.reject(refreshError);
     } finally {
-      isRefreshing = false;
+      refreshing = false;
     }
   }
 );
