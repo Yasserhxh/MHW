@@ -6,7 +6,7 @@ using MoroccanWallet.Shared.Kernel.Errors;
 
 namespace MoroccanWallet.Modules.GroceryPrices.Application.Queries;
 
-public sealed record GetPriceHistoryQuery(Guid ProductId, int Limit) : IQuery<PriceHistoryResponse>;
+public sealed record GetPriceHistoryQuery(Guid UserId, Guid ProductId, int Limit) : IQuery<PriceHistoryResponse>;
 
 public sealed record PriceHistoryEntryDto(
     Guid Id,
@@ -36,7 +36,7 @@ public sealed class GetPriceHistoryQueryHandler(GroceryPricesDbContext db)
 
         var entries = await db.PriceEntries
             .AsNoTracking()
-            .Where(e => e.ProductId == request.ProductId)
+            .Where(e => e.ProductId == request.ProductId && e.UserId == request.UserId)
             .OrderByDescending(e => e.ObservedAt)
             .Take(Math.Clamp(request.Limit, 1, 200))
             .Select(e => new PriceHistoryEntryDto(e.Id, e.Price, e.Currency, e.StoreName, e.ObservedAt))

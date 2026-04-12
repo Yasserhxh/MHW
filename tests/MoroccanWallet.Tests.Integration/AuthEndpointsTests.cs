@@ -1,8 +1,12 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using MoroccanWallet.Modules.Identity.Domain.Entities;
 
 namespace MoroccanWallet.Tests.Integration;
@@ -272,6 +276,19 @@ public sealed class AuthEndpointsTests
     }
 
     [Fact]
+    public async Task ProtectedEndpoints_WithMissingSubjectClaim_ReturnUnauthorized_InsteadOfServerError()
+    {
+        await using var factory = new AuthIntegrationFactory();
+        using var client = factory.CreateClient();
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateJwt(factory, [new Claim(ClaimTypes.Email, "missing-sub@example.com")]));
+
+        var response = await client.GetAsync("/api/v1/wallets");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task AuthSensitiveRateLimiting_TriggersOnRepeatedLoginAttempts()
     {
         await using var factory = new AuthIntegrationFactory();
@@ -292,6 +309,26 @@ public sealed class AuthEndpointsTests
         lastResponse!.StatusCode.Should().Be((HttpStatusCode)429);
     }
 
+    [Fact]
+    public async Task Refresh_RateLimiting_TriggersOnRepeatedInvalidAttempts()
+    {
+        await using var factory = new AuthIntegrationFactory();
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Forwarded-For", "203.0.113.11");
+
+        HttpResponseMessage? lastResponse = null;
+        for (var i = 0; i < 6; i++)
+        {
+            lastResponse = await client.PostAsJsonAsync("/api/v1/auth/refresh", new
+            {
+                refreshToken = $"invalid-refresh-token-{i}"
+            });
+        }
+
+        lastResponse.Should().NotBeNull();
+        lastResponse!.StatusCode.Should().Be((HttpStatusCode)429);
+    }
+
     private static async Task RegisterAndVerifyAsync(HttpClient client, AuthIntegrationFactory factory, string email, string password)
     {
         await client.PostAsJsonAsync("/api/v1/auth/register", new { email, password });
@@ -305,6 +342,20 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync("/api/v1/auth/login", new { email, password });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         return (await response.Content.ReadFromJsonAsync<AuthResponse>())!;
+    }
+
+    private static string CreateJwt(AuthIntegrationFactory factory, IEnumerable<Claim> claims)
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(factory.JwtSecret));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var token = new JwtSecurityToken(
+            issuer: factory.JwtIssuer,
+            audience: factory.JwtAudience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(5),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     private sealed record AuthResponse(

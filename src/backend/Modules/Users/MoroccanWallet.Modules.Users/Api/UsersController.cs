@@ -7,7 +7,6 @@ using MoroccanWallet.Modules.Users.Application.Commands;
 using MoroccanWallet.Modules.Users.Application.Queries;
 using MoroccanWallet.Shared.Infrastructure.Extensions;
 using MoroccanWallet.Shared.Kernel.Primitives;
-using System.Security.Claims;
 
 namespace MoroccanWallet.Modules.Users.Api;
 
@@ -18,9 +17,7 @@ namespace MoroccanWallet.Modules.Users.Api;
 [EnableRateLimiting(RateLimitPolicies.General)]
 public sealed class UsersController(IMediator mediator) : ControllerBase
 {
-    private Guid CurrentUserId => Guid.Parse(
-        User.FindFirstValue(ClaimTypes.NameIdentifier)
-        ?? User.FindFirstValue("sub")!);
+    private Guid CurrentUserId => User.GetRequiredUserId();
 
     [HttpGet("me")]
     [HttpGet("profile")]

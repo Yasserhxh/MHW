@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.RateLimiting;
 using MoroccanWallet.Modules.Identity.Application.Commands;
 using MoroccanWallet.Shared.Infrastructure.Extensions;
 using MoroccanWallet.Shared.Kernel.Primitives;
-using System.Security.Claims;
 
 namespace MoroccanWallet.Modules.Identity.Api;
 
@@ -33,6 +32,7 @@ public sealed class AuthController(IMediator mediator) : ControllerBase
     }
 
     [HttpPost("verify-email")]
+    [EnableRateLimiting(RateLimitPolicies.AuthSensitive)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<IResult> VerifyEmail(
@@ -65,6 +65,7 @@ public sealed class AuthController(IMediator mediator) : ControllerBase
     }
 
     [HttpPost("refresh")]
+    [EnableRateLimiting(RateLimitPolicies.AuthSensitive)]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<IResult> Refresh(
@@ -93,6 +94,7 @@ public sealed class AuthController(IMediator mediator) : ControllerBase
     }
 
     [HttpPost("reset-password")]
+    [EnableRateLimiting(RateLimitPolicies.AuthSensitive)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<IResult> ResetPassword(
@@ -113,11 +115,8 @@ public sealed class AuthController(IMediator mediator) : ControllerBase
         [FromBody] LogoutRequest request,
         CancellationToken cancellationToken)
     {
-        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue("sub")!);
-
         var result = await mediator.Send(
-            new LogoutCommand(request.RefreshToken, userId),
+            new LogoutCommand(request.RefreshToken, User.GetRequiredUserId()),
             cancellationToken);
 
         return result.ToHttpResult();
@@ -128,10 +127,7 @@ public sealed class AuthController(IMediator mediator) : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IResult> LogoutAll(CancellationToken cancellationToken)
     {
-        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue("sub")!);
-
-        var result = await mediator.Send(new LogoutAllCommand(userId), cancellationToken);
+        var result = await mediator.Send(new LogoutAllCommand(User.GetRequiredUserId()), cancellationToken);
 
         return result.ToHttpResult();
     }

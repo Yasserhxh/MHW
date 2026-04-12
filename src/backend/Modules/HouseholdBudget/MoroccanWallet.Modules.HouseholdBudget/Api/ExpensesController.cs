@@ -8,7 +8,6 @@ using MoroccanWallet.Modules.HouseholdBudget.Application.Queries;
 using MoroccanWallet.Shared.Infrastructure.Extensions;
 using MoroccanWallet.Shared.Kernel.Application;
 using MoroccanWallet.Shared.Kernel.Primitives;
-using System.Security.Claims;
 
 namespace MoroccanWallet.Modules.HouseholdBudget.Api;
 
@@ -20,9 +19,7 @@ namespace MoroccanWallet.Modules.HouseholdBudget.Api;
 [EnableRateLimiting(RateLimitPolicies.General)]
 public sealed class ExpensesController(IMediator mediator) : ControllerBase
 {
-    private Guid CurrentUserId => Guid.Parse(
-        User.FindFirstValue(ClaimTypes.NameIdentifier)
-        ?? User.FindFirstValue("sub")!);
+    private Guid CurrentUserId => User.GetRequiredUserId();
 
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<ExpenseSummaryDto>), StatusCodes.Status200OK)]
@@ -36,7 +33,7 @@ public sealed class ExpensesController(IMediator mediator) : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var result = await mediator.Send(
-            new GetExpensesQuery(CurrentUserId, page, Math.Clamp(pageSize, 1, 100), categoryId, from, to, search),
+            new GetExpensesQuery(CurrentUserId, Math.Max(page, 1), Math.Clamp(pageSize, 1, 100), categoryId, from, to, search),
             cancellationToken);
         return result.ToHttpResult();
     }
@@ -87,7 +84,7 @@ public sealed class ExpensesController(IMediator mediator) : ControllerBase
                 request.IsRecurring,
                 request.Tags),
             cancellationToken);
-        return result.ToCreatedResult($"/api/v1/expenses/{result.Value?.Id}");
+        return result.ToCreatedResult(value => $"/api/v1/expenses/{value.Id}");
     }
 
     [HttpPut("{id:guid}")]

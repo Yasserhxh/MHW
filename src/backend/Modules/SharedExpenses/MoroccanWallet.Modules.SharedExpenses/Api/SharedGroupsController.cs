@@ -8,7 +8,6 @@ using MoroccanWallet.Modules.SharedExpenses.Application.Queries;
 using MoroccanWallet.Shared.Infrastructure.Extensions;
 using MoroccanWallet.Shared.Kernel.Application;
 using MoroccanWallet.Shared.Kernel.Primitives;
-using System.Security.Claims;
 
 namespace MoroccanWallet.Modules.SharedExpenses.Api;
 
@@ -20,9 +19,7 @@ namespace MoroccanWallet.Modules.SharedExpenses.Api;
 [EnableRateLimiting(RateLimitPolicies.General)]
 public sealed class SharedGroupsController(IMediator mediator) : ControllerBase
 {
-    private Guid CurrentUserId => Guid.Parse(
-        User.FindFirstValue(ClaimTypes.NameIdentifier)
-        ?? User.FindFirstValue("sub")!);
+    private Guid CurrentUserId => User.GetRequiredUserId();
 
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<GroupSummaryDto>), StatusCodes.Status200OK)]
@@ -61,7 +58,7 @@ public sealed class SharedGroupsController(IMediator mediator) : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var result = await mediator.Send(
-            new GetGroupExpensesQuery(CurrentUserId, id, page, Math.Clamp(pageSize, 1, 100)),
+            new GetGroupExpensesQuery(CurrentUserId, id, Math.Max(page, 1), Math.Clamp(pageSize, 1, 100)),
             cancellationToken);
         return result.ToHttpResult();
     }
@@ -76,7 +73,7 @@ public sealed class SharedGroupsController(IMediator mediator) : ControllerBase
         var result = await mediator.Send(
             new CreateGroupCommand(CurrentUserId, request.Name, request.Description, request.Currency),
             cancellationToken);
-        return result.ToCreatedResult($"/api/v1/groups/{result.Value?.Id}");
+        return result.ToCreatedResult(value => $"/api/v1/groups/{value.Id}");
     }
 
     [HttpPost("{id:guid}/members")]
@@ -113,7 +110,7 @@ public sealed class SharedGroupsController(IMediator mediator) : ControllerBase
                 request.SplitType,
                 request.Splits),
             cancellationToken);
-        return result.ToCreatedResult($"/api/v1/groups/{id}/expenses/{result.Value?.Id}");
+        return result.ToCreatedResult(value => $"/api/v1/groups/{id}/expenses/{value.Id}");
     }
 
     [HttpGet("/api/v1/shared-expenses")]
@@ -125,7 +122,7 @@ public sealed class SharedGroupsController(IMediator mediator) : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var result = await mediator.Send(
-            new GetGroupExpensesQuery(CurrentUserId, groupId, page, Math.Clamp(pageSize, 1, 100)),
+            new GetGroupExpensesQuery(CurrentUserId, groupId, Math.Max(page, 1), Math.Clamp(pageSize, 1, 100)),
             cancellationToken);
         return result.ToHttpResult();
     }
@@ -158,7 +155,7 @@ public sealed class SharedGroupsController(IMediator mediator) : ControllerBase
                 request.SplitType,
                 request.Splits),
             cancellationToken);
-        return result.ToCreatedResult($"/api/v1/shared-expenses/{result.Value?.Id}");
+        return result.ToCreatedResult(value => $"/api/v1/shared-expenses/{value.Id}");
     }
 
     [HttpPost("/api/v1/shared-expenses/settlements")]
@@ -178,7 +175,7 @@ public sealed class SharedGroupsController(IMediator mediator) : ControllerBase
                 request.SettledOn,
                 request.Notes),
             cancellationToken);
-        return result.ToCreatedResult($"/api/v1/shared-expenses/settlements/{result.Value?.Id}");
+        return result.ToCreatedResult(value => $"/api/v1/shared-expenses/settlements/{value.Id}");
     }
 }
 

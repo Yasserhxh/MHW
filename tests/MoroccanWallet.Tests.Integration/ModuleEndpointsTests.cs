@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
 using MoroccanWallet.Modules.GroceryPrices.Domain.Entities;
 using MoroccanWallet.Modules.HouseholdBudget.Domain.Entities;
@@ -242,6 +243,97 @@ public sealed class ModuleEndpointsTests
 
         var removeFavorite = await client.DeleteAsync($"/api/v1/grocery-prices/favorites/{product.Id}");
         removeFavorite.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task GroceryPriceEntries_Are_UserScoped_And_DoNotExpose_OwnerIdentifiers()
+    {
+        await using var factory = new AuthIntegrationFactory();
+        using var client = factory.CreateClient();
+        var auth = await RegisterVerifyAndLoginAsync(factory, client, "grocery-scope@example.com");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+
+        var createProduct = await client.PostAsJsonAsync("/api/v1/grocery-prices/products", new
+        {
+            name = "Olive Oil",
+            category = "Pantry",
+            unit = "1L",
+            barcode = "555123"
+        });
+        createProduct.StatusCode.Should().Be(HttpStatusCode.Created);
+        var product = await createProduct.Content.ReadFromJsonAsync<CreatedIdResponse>();
+
+        await client.PostAsJsonAsync("/api/v1/grocery-prices/entries", new
+        {
+            productId = product!.Id,
+            price = 89,
+            currency = "MAD",
+            storeName = "Carrefour",
+            observedAt = DateTime.UtcNow
+        });
+
+        await factory.MutateGroceryPricesDbAsync(async db =>
+        {
+            db.PriceEntries.Add(PriceEntry.Create(product.Id, Guid.NewGuid(), 999, "MAD", "Foreign Store", null, DateTime.UtcNow));
+            await Task.CompletedTask;
+        });
+
+        var entriesResponse = await client.GetAsync($"/api/v1/grocery-prices/entries?productId={product.Id}");
+        entriesResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var entriesJson = await entriesResponse.Content.ReadAsStringAsync();
+        entriesJson.Should().Contain("Carrefour");
+        entriesJson.Should().NotContain("Foreign Store");
+        entriesJson.ToLowerInvariant().Should().NotContain("userid");
+
+        var historyResponse = await client.GetAsync($"/api/v1/grocery-prices/products/{product.Id}/history");
+        historyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var historyJson = await historyResponse.Content.ReadAsStringAsync();
+        historyJson.Should().Contain("Carrefour");
+        historyJson.Should().NotContain("Foreign Store");
+    }
+
+    [Fact]
+    public async Task Wallet_Create_Ignores_Overposted_UserId_And_ValidationFailures_Return422()
+    {
+        await using var factory = new AuthIntegrationFactory();
+        using var client = factory.CreateClient();
+        var auth = await RegisterVerifyAndLoginAsync(factory, client, "wallets@example.com");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+
+        using var overpostedRequest = new StringContent(
+            """
+            {
+              "name":"Secure Wallet",
+              "type":1,
+              "currency":"MAD",
+              "currentBalance":1200,
+              "color":"#0f766e",
+              "icon":"wallet",
+              "userId":"11111111-1111-1111-1111-111111111111"
+            }
+            """,
+            Encoding.UTF8,
+            "application/json");
+
+        var createResponse = await client.PostAsync("/api/v1/wallets", overpostedRequest);
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var wallet = await createResponse.Content.ReadFromJsonAsync<CreatedIdResponse>();
+
+        await factory.MutateBudgetDbAsync(async db =>
+        {
+            var createdWallet = await db.Wallets.FindAsync(wallet!.Id);
+            createdWallet.Should().NotBeNull();
+            createdWallet!.UserId.Should().Be(auth.UserId);
+        });
+
+        var invalidResponse = await client.PostAsJsonAsync("/api/v1/wallets", new
+        {
+            name = "",
+            type = 1,
+            currency = "BAD",
+            currentBalance = -1
+        });
+        invalidResponse.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     private static async Task<AuthLoginResponse> RegisterVerifyAndLoginAsync(AuthIntegrationFactory factory, HttpClient client, string email)

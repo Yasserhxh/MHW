@@ -69,7 +69,7 @@ public sealed class GetProductsQueryHandler(GroceryPricesDbContext db)
         // Get latest price per product (max observed date, pick one row per product)
         var latestPrices = await db.PriceEntries
             .AsNoTracking()
-            .Where(e => productIds.Contains(e.ProductId))
+            .Where(e => productIds.Contains(e.ProductId) && e.UserId == request.UserId)
             .GroupBy(e => e.ProductId)
             .Select(g => new
             {

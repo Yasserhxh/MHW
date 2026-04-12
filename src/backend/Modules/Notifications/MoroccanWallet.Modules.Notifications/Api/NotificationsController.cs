@@ -8,7 +8,6 @@ using MoroccanWallet.Modules.Notifications.Application.Queries;
 using MoroccanWallet.Shared.Infrastructure.Extensions;
 using MoroccanWallet.Shared.Kernel.Application;
 using MoroccanWallet.Shared.Kernel.Primitives;
-using System.Security.Claims;
 
 namespace MoroccanWallet.Modules.Notifications.Api;
 
@@ -19,9 +18,7 @@ namespace MoroccanWallet.Modules.Notifications.Api;
 [EnableRateLimiting(RateLimitPolicies.General)]
 public sealed class NotificationsController(IMediator mediator) : ControllerBase
 {
-    private Guid CurrentUserId => Guid.Parse(
-        User.FindFirstValue(ClaimTypes.NameIdentifier)
-        ?? User.FindFirstValue("sub")!);
+    private Guid CurrentUserId => User.GetRequiredUserId();
 
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<NotificationDto>), StatusCodes.Status200OK)]
@@ -32,7 +29,7 @@ public sealed class NotificationsController(IMediator mediator) : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var result = await mediator.Send(
-            new GetNotificationsQuery(CurrentUserId, page, Math.Clamp(pageSize, 1, 100), isRead),
+            new GetNotificationsQuery(CurrentUserId, Math.Max(page, 1), Math.Clamp(pageSize, 1, 100), isRead),
             cancellationToken);
         return result.ToHttpResult();
     }

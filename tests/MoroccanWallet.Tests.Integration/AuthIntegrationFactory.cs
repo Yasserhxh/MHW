@@ -28,6 +28,9 @@ public sealed class AuthIntegrationFactory : WebApplicationFactory<Program>
     private readonly string _notificationsDatabaseName = $"notifications-tests-{Guid.NewGuid():N}";
     private readonly string _sharedExpensesDatabaseName = $"shared-tests-{Guid.NewGuid():N}";
     private readonly string _groceryPricesDatabaseName = $"grocery-tests-{Guid.NewGuid():N}";
+    public string JwtSecret { get; } = "integration-test-secret-key-with-32-characters!";
+    public string JwtIssuer { get; } = "integration-tests";
+    public string JwtAudience { get; } = "integration-clients";
 
     public FakeEmailSender EmailSender { get; } = new();
 
@@ -38,9 +41,9 @@ public sealed class AuthIntegrationFactory : WebApplicationFactory<Program>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Jwt:SecretKey"] = "integration-test-secret-key-with-32-characters!",
-                ["Jwt:Issuer"] = "integration-tests",
-                ["Jwt:Audience"] = "integration-clients",
+                ["Jwt:SecretKey"] = JwtSecret,
+                ["Jwt:Issuer"] = JwtIssuer,
+                ["Jwt:Audience"] = JwtAudience,
                 ["ConnectionStrings:Default"] = "Host=localhost;Port=5432;Database=ignored;Username=postgres;Password=ignored"
             });
         });

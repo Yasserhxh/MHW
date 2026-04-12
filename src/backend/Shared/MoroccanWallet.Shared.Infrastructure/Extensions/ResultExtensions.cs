@@ -21,6 +21,11 @@ public static class ResultExtensions
             ? Results.Created(location, result.Value)
             : MapError(result.Error);
 
+    public static IResult ToCreatedResult<T>(this Result<T> result, Func<T, string> locationFactory) =>
+        result.IsSuccess
+            ? Results.Created(locationFactory(result.Value), result.Value)
+            : MapError(result.Error);
+
     private static IResult MapError(Error error)
     {
         var statusCode = error.Type switch

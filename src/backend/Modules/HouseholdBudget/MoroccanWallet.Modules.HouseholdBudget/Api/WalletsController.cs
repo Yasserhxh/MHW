@@ -8,7 +8,6 @@ using MoroccanWallet.Modules.HouseholdBudget.Application.Queries;
 using MoroccanWallet.Modules.HouseholdBudget.Domain.Entities;
 using MoroccanWallet.Shared.Infrastructure.Extensions;
 using MoroccanWallet.Shared.Kernel.Primitives;
-using System.Security.Claims;
 
 namespace MoroccanWallet.Modules.HouseholdBudget.Api;
 
@@ -19,9 +18,7 @@ namespace MoroccanWallet.Modules.HouseholdBudget.Api;
 [EnableRateLimiting(RateLimitPolicies.General)]
 public sealed class WalletsController(IMediator mediator) : ControllerBase
 {
-    private Guid CurrentUserId => Guid.Parse(
-        User.FindFirstValue(ClaimTypes.NameIdentifier)
-        ?? User.FindFirstValue("sub")!);
+    private Guid CurrentUserId => User.GetRequiredUserId();
 
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<WalletDto>), StatusCodes.Status200OK)]
@@ -48,7 +45,7 @@ public sealed class WalletsController(IMediator mediator) : ControllerBase
         var result = await mediator.Send(
             new CreateWalletCommand(CurrentUserId, request.Name, request.Type, request.Currency, request.CurrentBalance, request.Color, request.Icon),
             cancellationToken);
-        return result.ToCreatedResult($"/api/v1/wallets/{result.Value?.Id}");
+        return result.ToCreatedResult(value => $"/api/v1/wallets/{value.Id}");
     }
 
     [HttpPut("{id:guid}")]

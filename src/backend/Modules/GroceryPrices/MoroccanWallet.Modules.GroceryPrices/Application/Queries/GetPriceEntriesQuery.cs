@@ -13,10 +13,9 @@ public sealed record PriceEntryDto(
     string Currency,
     string? StoreName,
     string? StoreLocation,
-    DateTime ObservedAt,
-    Guid UserId);
+    DateTime ObservedAt);
 
-public sealed record GetPriceEntriesQuery(Guid? ProductId, int Page, int PageSize) : IQuery<PagedResult<PriceEntryDto>>;
+public sealed record GetPriceEntriesQuery(Guid UserId, Guid? ProductId, int Page, int PageSize) : IQuery<PagedResult<PriceEntryDto>>;
 
 public sealed class GetPriceEntriesQueryHandler(GroceryPricesDbContext db)
     : IQueryHandler<GetPriceEntriesQuery, PagedResult<PriceEntryDto>>
@@ -25,6 +24,7 @@ public sealed class GetPriceEntriesQueryHandler(GroceryPricesDbContext db)
     {
         var query = db.PriceEntries
             .AsNoTracking()
+            .Where(e => e.UserId == request.UserId)
             .Join(db.Products.AsNoTracking(), e => e.ProductId, p => p.Id, (e, p) => new { Entry = e, ProductName = p.Name });
 
         if (request.ProductId.HasValue)
@@ -44,8 +44,7 @@ public sealed class GetPriceEntriesQueryHandler(GroceryPricesDbContext db)
                 x.Entry.Currency,
                 x.Entry.StoreName,
                 x.Entry.StoreLocation,
-                x.Entry.ObservedAt,
-                x.Entry.UserId))
+                x.Entry.ObservedAt))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<PriceEntryDto>(items, total, request.Page, request.PageSize);

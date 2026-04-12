@@ -17,7 +17,7 @@ public sealed class ExceptionHandlingMiddleware(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Unhandled exception: {Message}", ex.Message);
+            logger.LogError(ex, "Unhandled exception {ExceptionType} for trace {TraceId}", ex.GetType().Name, context.TraceIdentifier);
             await HandleExceptionAsync(context, ex);
         }
     }

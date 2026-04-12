@@ -58,7 +58,13 @@ public sealed class CreateSettlementCommandHandler(SharedExpensesDbContext db)
         db.Settlements.Add(settlement);
 
         var unsettledSplits = await db.ExpenseSplits
-            .Where(s => s.UserId == request.FromUserId && !s.IsSettled)
+            .Join(
+                db.SharedExpenses,
+                split => split.SharedExpenseId,
+                expense => expense.Id,
+                (split, expense) => new { Split = split, Expense = expense })
+            .Where(x => x.Split.UserId == request.FromUserId && !x.Split.IsSettled && x.Expense.GroupId == request.GroupId)
+            .Select(x => x.Split)
             .OrderBy(s => s.SharedExpenseId)
             .ToListAsync(cancellationToken);
 

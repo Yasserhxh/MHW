@@ -7,7 +7,6 @@ using MoroccanWallet.Modules.HouseholdBudget.Application.Commands;
 using MoroccanWallet.Modules.HouseholdBudget.Application.Queries;
 using MoroccanWallet.Shared.Infrastructure.Extensions;
 using MoroccanWallet.Shared.Kernel.Primitives;
-using System.Security.Claims;
 
 namespace MoroccanWallet.Modules.HouseholdBudget.Api;
 
@@ -19,9 +18,7 @@ namespace MoroccanWallet.Modules.HouseholdBudget.Api;
 [EnableRateLimiting(RateLimitPolicies.General)]
 public sealed class BudgetController(IMediator mediator) : ControllerBase
 {
-    private Guid CurrentUserId => Guid.Parse(
-        User.FindFirstValue(ClaimTypes.NameIdentifier)
-        ?? User.FindFirstValue("sub")!);
+    private Guid CurrentUserId => User.GetRequiredUserId();
 
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<MonthlyBudgetDto>), StatusCodes.Status200OK)]

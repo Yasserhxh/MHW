@@ -9,7 +9,6 @@ using MoroccanWallet.Modules.Reminders.Domain.Entities;
 using MoroccanWallet.Shared.Infrastructure.Extensions;
 using MoroccanWallet.Shared.Kernel.Application;
 using MoroccanWallet.Shared.Kernel.Primitives;
-using System.Security.Claims;
 
 namespace MoroccanWallet.Modules.Reminders.Api;
 
@@ -20,9 +19,7 @@ namespace MoroccanWallet.Modules.Reminders.Api;
 [EnableRateLimiting(RateLimitPolicies.General)]
 public sealed class RemindersController(IMediator mediator) : ControllerBase
 {
-    private Guid CurrentUserId => Guid.Parse(
-        User.FindFirstValue(ClaimTypes.NameIdentifier)
-        ?? User.FindFirstValue("sub")!);
+    private Guid CurrentUserId => User.GetRequiredUserId();
 
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<ReminderDto>), StatusCodes.Status200OK)]
@@ -33,7 +30,7 @@ public sealed class RemindersController(IMediator mediator) : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var result = await mediator.Send(
-            new GetRemindersQuery(CurrentUserId, isCompleted, page, Math.Clamp(pageSize, 1, 100)),
+            new GetRemindersQuery(CurrentUserId, isCompleted, Math.Max(page, 1), Math.Clamp(pageSize, 1, 100)),
             cancellationToken);
         return result.ToHttpResult();
     }
@@ -65,7 +62,7 @@ public sealed class RemindersController(IMediator mediator) : ControllerBase
                 request.DueDate,
                 request.Frequency),
             cancellationToken);
-        return result.ToCreatedResult($"/api/v1/reminders/{result.Value?.Id}");
+        return result.ToCreatedResult(value => $"/api/v1/reminders/{value.Id}");
     }
 
     [HttpPut("{id:guid}")]

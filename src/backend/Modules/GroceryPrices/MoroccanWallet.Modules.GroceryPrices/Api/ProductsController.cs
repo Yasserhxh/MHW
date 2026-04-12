@@ -8,7 +8,6 @@ using MoroccanWallet.Modules.GroceryPrices.Application.Queries;
 using MoroccanWallet.Shared.Infrastructure.Extensions;
 using MoroccanWallet.Shared.Kernel.Application;
 using MoroccanWallet.Shared.Kernel.Primitives;
-using System.Security.Claims;
 
 namespace MoroccanWallet.Modules.GroceryPrices.Api;
 
@@ -20,9 +19,7 @@ namespace MoroccanWallet.Modules.GroceryPrices.Api;
 [EnableRateLimiting(RateLimitPolicies.General)]
 public sealed class ProductsController(IMediator mediator) : ControllerBase
 {
-    private Guid CurrentUserId => Guid.Parse(
-        User.FindFirstValue(ClaimTypes.NameIdentifier)
-        ?? User.FindFirstValue("sub")!);
+    private Guid CurrentUserId => User.GetRequiredUserId();
 
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<ProductDto>), StatusCodes.Status200OK)]
@@ -35,7 +32,7 @@ public sealed class ProductsController(IMediator mediator) : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var result = await mediator.Send(
-            new GetProductsQuery(CurrentUserId, search, category, favoritesOnly, page, Math.Clamp(pageSize, 1, 100)),
+            new GetProductsQuery(CurrentUserId, search, category, favoritesOnly, Math.Max(page, 1), Math.Clamp(pageSize, 1, 100)),
             cancellationToken);
         return result.ToHttpResult();
     }
@@ -49,7 +46,7 @@ public sealed class ProductsController(IMediator mediator) : ControllerBase
         [FromQuery] int limit = 50,
         CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(new GetPriceHistoryQuery(id, limit), cancellationToken);
+        var result = await mediator.Send(new GetPriceHistoryQuery(CurrentUserId, id, limit), cancellationToken);
         return result.ToHttpResult();
     }
 
@@ -63,7 +60,7 @@ public sealed class ProductsController(IMediator mediator) : ControllerBase
         var result = await mediator.Send(
             new CreateProductCommand(CurrentUserId, request.Name, request.Category, request.Unit, request.Barcode),
             cancellationToken);
-        return result.ToCreatedResult($"/api/v1/products/{result.Value?.Id}");
+        return result.ToCreatedResult(value => $"/api/v1/products/{value.Id}");
     }
 
     [HttpPost("{id:guid}/price-entries")]
@@ -77,7 +74,7 @@ public sealed class ProductsController(IMediator mediator) : ControllerBase
         var result = await mediator.Send(
             new AddPriceEntryCommand(CurrentUserId, id, request.Price, request.Currency, request.StoreName, request.StoreLocation, request.ObservedAt),
             cancellationToken);
-        return result.ToCreatedResult($"/api/v1/products/{id}/price-entries/{result.Value?.Id}");
+        return result.ToCreatedResult(value => $"/api/v1/products/{id}/price-entries/{value.Id}");
     }
 
     [HttpPost("{id:guid}/favorite")]
@@ -96,7 +93,7 @@ public sealed class ProductsController(IMediator mediator) : ControllerBase
         var result = await mediator.Send(
             new AddPriceEntryCommand(CurrentUserId, request.ProductId, request.Price, request.Currency, request.StoreName, request.StoreLocation, request.ObservedAt),
             cancellationToken);
-        return result.ToCreatedResult($"/api/v1/grocery-prices/entries/{result.Value?.Id}");
+        return result.ToCreatedResult(value => $"/api/v1/grocery-prices/entries/{value.Id}");
     }
 
     [HttpGet("/api/v1/grocery-prices/entries")]
@@ -107,7 +104,7 @@ public sealed class ProductsController(IMediator mediator) : ControllerBase
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(new GetPriceEntriesQuery(productId, page, Math.Clamp(pageSize, 1, 100)), cancellationToken);
+        var result = await mediator.Send(new GetPriceEntriesQuery(CurrentUserId, productId, Math.Max(page, 1), Math.Clamp(pageSize, 1, 100)), cancellationToken);
         return result.ToHttpResult();
     }
 

@@ -125,6 +125,18 @@ try
                     }
 
                     return Task.CompletedTask;
+                },
+                OnTokenValidated = ctx =>
+                {
+                    var subject = ctx.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                        ?? ctx.Principal?.FindFirst("sub")?.Value;
+
+                    if (!Guid.TryParse(subject, out _))
+                    {
+                        ctx.Fail("Token is missing a valid subject claim.");
+                    }
+
+                    return Task.CompletedTask;
                 }
             };
         });
