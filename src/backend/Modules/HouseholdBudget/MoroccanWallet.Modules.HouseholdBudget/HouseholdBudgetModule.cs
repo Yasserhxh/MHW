@@ -1,5 +1,7 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using MoroccanWallet.Modules.HouseholdBudget.Infrastructure.Persistence;
 
 namespace MoroccanWallet.Modules.HouseholdBudget;
 
@@ -9,7 +11,10 @@ public static class HouseholdBudgetModule
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // TODO: Implement HouseholdBudget module registration (Phase 4+)
+        services.AddDbContext<HouseholdBudgetDbContext>(opts =>
+            opts.UseNpgsql(configuration.GetConnectionString("Default"),
+                npgsql => npgsql.MigrationsHistoryTable("__budget_migrations", "budget")));
+
         return services;
     }
 }

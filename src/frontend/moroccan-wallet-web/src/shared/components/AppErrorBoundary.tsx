@@ -11,7 +11,9 @@ export class AppErrorBoundary extends Component<Props, State> {
     return { hasError: true };
   }
 
-  componentDidCatch(_error: Error, _errorInfo: ErrorInfo) {}
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Unhandled UI error', error, errorInfo);
+  }
 
   render() {
     if (this.state.hasError) return <ErrorState message="Unexpected UI error. Please refresh." />;

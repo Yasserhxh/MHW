@@ -173,7 +173,14 @@ try
     {
         cfg.RegisterServicesFromAssemblies(
             typeof(IdentityModule).Assembly,
-            typeof(NotificationsModule).Assembly
+            typeof(NotificationsModule).Assembly,
+            typeof(MoroccanWallet.Modules.Users.UsersModule).Assembly,
+            typeof(MoroccanWallet.Modules.HouseholdBudget.HouseholdBudgetModule).Assembly,
+            typeof(MoroccanWallet.Modules.Reminders.RemindersModule).Assembly,
+            typeof(MoroccanWallet.Modules.SharedExpenses.SharedExpensesModule).Assembly,
+            typeof(MoroccanWallet.Modules.GroceryPrices.GroceryPricesModule).Assembly,
+            typeof(MoroccanWallet.Modules.ReferenceData.ReferenceDataModule).Assembly,
+            typeof(MoroccanWallet.Modules.Administration.AdministrationModule).Assembly
         );
     });
 
@@ -182,7 +189,12 @@ try
 
     // ─── FluentValidation ────────────────────────────────────────────────────
     builder.Services.AddValidatorsFromAssemblies([
-        typeof(IdentityModule).Assembly
+        typeof(IdentityModule).Assembly,
+        typeof(MoroccanWallet.Modules.Users.UsersModule).Assembly,
+        typeof(MoroccanWallet.Modules.HouseholdBudget.HouseholdBudgetModule).Assembly,
+        typeof(MoroccanWallet.Modules.Reminders.RemindersModule).Assembly,
+        typeof(MoroccanWallet.Modules.SharedExpenses.SharedExpensesModule).Assembly,
+        typeof(MoroccanWallet.Modules.GroceryPrices.GroceryPricesModule).Assembly
     ]);
 
     // ─── Email ───────────────────────────────────────────────────────────────

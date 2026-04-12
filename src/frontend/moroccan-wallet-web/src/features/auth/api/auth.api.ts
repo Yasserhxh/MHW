@@ -16,9 +16,10 @@ function mockResponse<T>(data: T): Promise<{ data: T }> {
 }
 
 export const authApi = {
-  register: (_payload: RegisterRequest) => {
+  register: (payload: RegisterRequest) => {
     // Real API (disabled during UI/layout development):
     // return apiClient.post('/auth/register', payload);
+    void payload;
     return mockResponse({ message: 'Mock register success' });
   },
 
@@ -35,33 +36,39 @@ export const authApi = {
     });
   },
 
-  refresh: (_refreshToken: string) => {
+  refresh: (refreshToken: string) => {
     // Real API (disabled during UI/layout development):
     // return apiClient.post('/auth/refresh', { refreshToken });
+    void refreshToken;
     return mockResponse({ accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token' });
   },
 
-  forgotPassword: (_payload: ForgotPasswordRequest) => {
+  forgotPassword: (payload: ForgotPasswordRequest) => {
     // Real API (disabled during UI/layout development):
     // return apiClient.post('/auth/forgot-password', payload);
+    void payload;
     return mockResponse({ message: 'Mock forgot-password email sent' });
   },
 
-  resetPassword: (_payload: ResetPasswordRequest) => {
+  resetPassword: (payload: ResetPasswordRequest) => {
     // Real API (disabled during UI/layout development):
     // return apiClient.post('/auth/reset-password', payload);
+    void payload;
     return mockResponse({ message: 'Mock password reset success' });
   },
 
-  verifyEmail: (_payload: VerifyEmailRequest) => {
+  verifyEmail: (payload: VerifyEmailRequest) => {
     // Real API (disabled during UI/layout development):
     // return apiClient.post('/auth/verify-email', payload);
+    void payload;
     return mockResponse({ message: 'Mock email verified' });
   },
 
-  logout: (_refreshToken: string, _accessToken?: string) => {
+  logout: (refreshToken: string, accessToken?: string) => {
     // Real API (disabled during UI/layout development):
-    // return apiClient.post('/auth/logout', { refreshToken: _refreshToken });
+    // return apiClient.post('/auth/logout', { refreshToken });
+    void refreshToken;
+    void accessToken;
     return mockResponse({ message: 'Mock logout success' });
   },
 

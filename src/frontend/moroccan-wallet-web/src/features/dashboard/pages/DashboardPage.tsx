@@ -1,30 +1,184 @@
-import { AppPageHeader } from '../../../shared/components/AppPageHeader';
-import { QuickAddButton } from '../../../shared/components/common';
-import { SectionCard } from '../../../shared/components/SectionCard';
-import { StatCard } from '../../../shared/components/StatCard';
-import { TransactionList } from '../../../shared/components/TransactionList';
-import { ReminderList } from '../../../shared/components/ReminderList';
-
-const recentTransactions = [
-  { id: '1', title: 'Carrefour Market', category: 'Groceries', amount: 265, date: 'Apr 09', status: 'paid' as const },
-  { id: '2', title: 'Electricity Bill', category: 'Utilities', amount: 410, date: 'Apr 12', status: 'upcoming' as const },
-];
+import { ChevronRight, ShoppingBasket, WalletCards } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { AppPageHeader } from '@/shared/components/AppPageHeader';
+import { DashboardKpiRow } from '@/shared/components/DashboardKpiRow';
+import { DashboardPreviewList } from '@/shared/components/DashboardPreviewList';
+import { LoadingState } from '@/shared/components/LoadingState';
+import { ErrorState } from '@/shared/components/ErrorState';
+import { QuickAddButton } from '@/shared/components/common';
+import { SectionCard } from '@/shared/components/SectionCard';
+import { TransactionList } from '@/shared/components/TransactionList';
+import { ReminderList } from '@/shared/components/ReminderList';
+import { CurrencyAmount } from '@/shared/components/CurrencyAmount';
+import { useDashboardSnapshot } from '../hooks/useDashboard';
+import { formatCurrency, formatRelativeDate } from '@/shared/utils/format';
 
 export default function DashboardPage() {
+  const { data, isLoading, isError, refetch } = useDashboardSnapshot();
+
+  if (isLoading) {
+    return <LoadingState message="Loading your household snapshot..." />;
+  }
+
+  if (isError || !data) {
+    return <ErrorState message="We could not load the dashboard right now." onRetry={() => void refetch()} />;
+  }
+
+  const kpis = [
+    {
+      id: 'spent',
+      label: 'Current Month Spent',
+      value: formatCurrency(data.summary.currentMonthSpent),
+      hint: `${Math.round((data.summary.currentMonthSpent / data.summary.monthBudget) * 100)}% of budget used`,
+      tone: 'warning' as const,
+    },
+    {
+      id: 'remaining',
+      label: 'Remaining Budget',
+      value: formatCurrency(data.summary.remainingBudget),
+      hint: 'Available for the rest of this month',
+      tone: 'success' as const,
+    },
+    {
+      id: 'upcoming',
+      label: 'Upcoming Bills & Reminders',
+      value: `${data.summary.upcomingItemsCount}`,
+      hint: 'Needs attention this week',
+      tone: 'info' as const,
+    },
+    {
+      id: 'household',
+      label: 'Household Balance',
+      value: formatCurrency(Math.abs(data.summary.householdBalance)),
+      hint: data.summary.householdBalance < 0 ? 'You currently owe the household' : 'Household owes you',
+      tone: data.summary.householdBalance < 0 ? 'danger' : 'success',
+    },
+  ];
+
+  const transactionItems = data.recentTransactions.map((item) => ({
+    ...item,
+    currency: 'MAD',
+    type: 'expense' as const,
+    walletId: 'main-wallet' as const,
+    paymentMethodId: 'card' as const,
+    createdAt: item.date,
+    dateLabel: item.date,
+    categoryLabel: item.category,
+    walletLabel: 'Main Wallet',
+    paymentMethodLabel: 'Card',
+  }));
+
   return (
-    <div className="page-grid">
-      <AppPageHeader title="Dashboard" subtitle="Your household finances at a glance." action={<QuickAddButton />} />
-      <div className="grid-4">
-        <StatCard label="Month spent" value="MAD 4,890" tone="warning" />
-        <StatCard label="Budget remaining" value="MAD 2,110" tone="success" />
-        <StatCard label="Upcoming bills" value="3" tone="warning" />
-        <StatCard label="Household balance" value="MAD -340" tone="danger" />
+    <div className="space-y-6">
+      <AppPageHeader
+        title="Dashboard"
+        subtitle="See what matters now across personal spending, shared activity, reminders, and household cash flow."
+        action={<QuickAddButton label="Add expense" to="/expenses/new" />}
+      />
+
+      <DashboardKpiRow items={kpis} />
+
+      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
+        <SectionCard
+          title="Recent transactions"
+          action={
+            <Link to="/expenses" className="inline-flex items-center gap-1 text-sm font-medium text-teal-700">
+              View all <ChevronRight className="h-4 w-4" />
+            </Link>
+          }
+        >
+          <TransactionList items={transactionItems} />
+        </SectionCard>
+
+        <SectionCard title="Upcoming reminders">
+          <ReminderList
+            items={data.upcomingReminders.map((item) => ({
+              id: item.id,
+              title: item.title,
+              dueDate: item.dueDate,
+              status: item.status === 'today' ? 'upcoming' : item.status === 'completed' ? 'paid' : item.status,
+            }))}
+          />
+        </SectionCard>
       </div>
-      <div className="grid-2">
-        <SectionCard title="Recent transactions"><TransactionList items={recentTransactions} /></SectionCard>
-        <SectionCard title="Upcoming reminders"><ReminderList items={[{ id: '1', title: 'Internet', dueDate: 'Apr 14', status: 'upcoming' }, { id: '2', title: 'Rent split', dueDate: 'Apr 16', status: 'overdue' }]} /></SectionCard>
-        <SectionCard title="Shared activity"><div className="list"><div className="list-item"><span>Youssef added Water Bill</span><span>MAD 180</span></div><div className="list-item"><span>Amina settled groceries</span><span>MAD 220</span></div></div></SectionCard>
-        <SectionCard title="Grocery updates & latest notifications"><div className="list"><div className="list-item"><span>Olive oil dropped to MAD 62</span><span>Marjane</span></div><div className="list-item"><span>Reminder: Electricity due in 2 days</span><span>now</span></div></div></SectionCard>
+
+      <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+        <SectionCard title="Spending overview">
+          <div className="space-y-4">
+            {data.topCategories.map((category) => (
+              <div key={category.id}>
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span className="font-medium text-slate-700">{category.label}</span>
+                  <span className="text-slate-500">{formatCurrency(category.amount)}</span>
+                </div>
+                <div className="h-2 rounded-full bg-slate-100">
+                  <div className="h-2 rounded-full bg-teal-600" style={{ width: `${category.percent}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Shared activity">
+          <DashboardPreviewList
+            items={data.sharedActivity.map((activity) => ({
+              id: activity.id,
+              title: activity.title,
+              subtitle: activity.subtitle,
+              meta: formatCurrency(activity.amount),
+            }))}
+          />
+        </SectionCard>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        <SectionCard title="Grocery price updates">
+          <DashboardPreviewList
+            items={data.groceryPrices.map((item) => ({
+              id: item.id,
+              title: item.productName,
+              subtitle: `${item.storeName} · was ${formatCurrency(item.previousPrice)}`,
+              meta: formatCurrency(item.latestPrice),
+              tone: item.latestPrice <= item.previousPrice ? 'success' : 'warning',
+            }))}
+          />
+        </SectionCard>
+
+        <SectionCard title="Notifications preview">
+          <DashboardPreviewList
+            items={data.notifications.map((notification) => ({
+              id: notification.id,
+              title: notification.title,
+              subtitle: notification.message,
+              meta: formatRelativeDate(notification.createdAt),
+              tone: notification.status === 'unread' ? 'warning' : 'default',
+            }))}
+          />
+        </SectionCard>
+
+        <SectionCard title="Household balance summary">
+          <div className="rounded-[1.5rem] bg-slate-950 p-5 text-white">
+            <div className="flex items-center gap-3 text-sm text-slate-300">
+              <WalletCards className="h-4 w-4 text-teal-300" />
+              Shared household snapshot
+            </div>
+            <div className="mt-4 text-3xl font-semibold tracking-tight">
+              <CurrencyAmount
+                amount={data.summary.householdBalance}
+                negative={data.summary.householdBalance < 0}
+                positive={data.summary.householdBalance > 0}
+                className="text-white"
+              />
+            </div>
+            <p className="mt-3 text-sm leading-6 text-slate-300">
+              Shared expenses are still being built, but the household summary already highlights the balance direction.
+            </p>
+            <div className="mt-5 flex items-center gap-2 text-sm font-medium text-teal-300">
+              <ShoppingBasket className="h-4 w-4" />
+              Grocery and shared utility changes will stay visible here
+            </div>
+          </div>
+        </SectionCard>
       </div>
     </div>
   );

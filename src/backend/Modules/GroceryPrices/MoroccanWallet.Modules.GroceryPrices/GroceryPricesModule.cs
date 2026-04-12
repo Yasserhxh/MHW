@@ -1,5 +1,7 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using MoroccanWallet.Modules.GroceryPrices.Infrastructure.Persistence;
 
 namespace MoroccanWallet.Modules.GroceryPrices;
 
@@ -9,7 +11,10 @@ public static class GroceryPricesModule
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // TODO: Implement GroceryPrices module registration (Phase 4+)
+        services.AddDbContext<GroceryPricesDbContext>(opts =>
+            opts.UseNpgsql(configuration.GetConnectionString("Default"),
+                npgsql => npgsql.MigrationsHistoryTable("__grocery_prices_migrations", "grocery_prices")));
+
         return services;
     }
 }

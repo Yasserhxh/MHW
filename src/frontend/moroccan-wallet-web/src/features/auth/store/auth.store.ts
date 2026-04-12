@@ -26,7 +26,13 @@ export const authStore = create<AuthState>()(
     }),
     {
       name: 'mhw-auth',
-      partialize: (s) => ({ refreshToken: s.refreshToken, userId: s.userId, email: s.email }),
+      partialize: (s) => ({
+        accessToken: s.accessToken,
+        refreshToken: s.refreshToken,
+        userId: s.userId,
+        email: s.email,
+        isAuthenticated: s.isAuthenticated,
+      }),
     }
   )
 );

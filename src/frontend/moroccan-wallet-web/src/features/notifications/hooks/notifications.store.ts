@@ -9,6 +9,7 @@ type State = {
   markRead: (id: string) => void;
   markAllRead: () => void;
   seed: (items: AppNotification[]) => void;
+  setUnreadCount: (count: number) => void;
 };
 
 export const useNotificationsStore = create<State>((set) => ({
@@ -21,4 +22,5 @@ export const useNotificationsStore = create<State>((set) => ({
   }),
   markAllRead: () => set((s) => ({ items: s.items.map((i) => ({ ...i, read: true })), unreadCount: 0 })),
   seed: (items) => set({ items, unreadCount: items.filter((i) => !i.read).length }),
+  setUnreadCount: (count) => set({ unreadCount: count }),
 }));

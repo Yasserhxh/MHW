@@ -9,7 +9,7 @@ public static class ReferenceDataModule
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // TODO: Implement ReferenceData module registration (Phase 4+)
+        // No infrastructure dependencies — all reference data is static
         return services;
     }
 }

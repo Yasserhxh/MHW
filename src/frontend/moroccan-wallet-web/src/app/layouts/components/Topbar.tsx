@@ -1,18 +1,38 @@
-import { useState } from 'react';
-import { Menu as MenuIcon, Bell, ChevronDown, Settings, LogOut, User } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Menu as MenuIcon, ChevronDown, Settings, LogOut, User, Plus } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { authApi } from '@/features/auth/api/auth.api';
+import { NotificationBell } from '@/shared/components/NotificationBell';
+import { useNotificationsStore } from '@/features/notifications/hooks/notifications.store';
 
 interface TopbarProps {
   onMenuClick: () => void;
 }
 
+const pageMeta: Array<{ match: RegExp; title: string; subtitle: string }> = [
+  { match: /^\/dashboard$/, title: 'Dashboard', subtitle: 'Track today, this month, and what needs attention next.' },
+  { match: /^\/expenses(\/new)?$/, title: 'Expenses', subtitle: 'Review personal spending and add transactions quickly.' },
+  { match: /^\/shared-expenses(\/[^/]+)?$/, title: 'Shared Expenses', subtitle: 'Keep household balances and settlements easy to understand.' },
+  { match: /^\/grocery-prices$/, title: 'Grocery Prices', subtitle: 'Remember prices, compare stores, and spot better deals.' },
+  { match: /^\/reminders$/, title: 'Reminders', subtitle: 'Stay ahead of bills, renewals, and recurring payments.' },
+  { match: /^\/notifications$/, title: 'Notifications', subtitle: 'See updates, reminders, and shared expense activity in one place.' },
+  { match: /^\/settings\/profile$/, title: 'Profile Settings', subtitle: 'Manage your name, avatar, and account details.' },
+  { match: /^\/settings\/preferences$/, title: 'Preference Settings', subtitle: 'Set your language, currency, and timezone preferences.' },
+  { match: /^\/settings\/security$/, title: 'Security Settings', subtitle: 'Review password and session-related account protection.' },
+];
+
 export function Topbar({ onMenuClick }: TopbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { email, accessToken, refreshToken, clearAuth } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+  const unreadCount = useNotificationsStore((state) => state.unreadCount);
   const initials = email?.slice(0, 2).toUpperCase() ?? 'U';
+  const currentPage = useMemo(
+    () => pageMeta.find((item) => item.match.test(location.pathname)) ?? pageMeta[0],
+    [location.pathname]
+  );
 
   const handleLogout = async () => {
     if (refreshToken && accessToken) {
@@ -27,66 +47,85 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   };
 
   return (
-    <header className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-4 lg:px-6 flex-shrink-0">
-      <button
-        onClick={onMenuClick}
-        className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors lg:hidden"
-      >
-        <MenuIcon className="w-5 h-5" />
-      </button>
-
-      <div className="flex-1" />
-
-      <div className="flex items-center gap-1">
-        <Link
-          to="/notifications"
-          className="relative p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
-        >
-          <Bell className="w-5 h-5" />
-        </Link>
-
-        <div className="relative ml-1">
+    <header className="flex flex-col gap-4 border-b border-slate-200 bg-[rgba(248,251,251,0.88)] px-4 py-4 backdrop-blur lg:px-6">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
           <button
-            onClick={() => setMenuOpen((open) => !open)}
-            className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+            onClick={onMenuClick}
+            className="mt-0.5 rounded-2xl border border-slate-200 bg-white p-2.5 text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-700 lg:hidden"
           >
-            <div className="w-7 h-7 rounded-full bg-primary-600 flex items-center justify-center text-white text-xs font-bold">
-              {initials}
-            </div>
-            <span className="text-sm font-medium text-slate-700 hidden sm:block max-w-32 truncate">
-              {email}
-            </span>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            <MenuIcon className="h-5 w-5" />
           </button>
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Household Wallet</div>
+            <h1 className="mt-1 truncate text-2xl font-semibold tracking-tight text-slate-900">{currentPage.title}</h1>
+            <p className="mt-1 max-w-2xl text-sm text-slate-500">{currentPage.subtitle}</p>
+          </div>
+        </div>
 
-          {menuOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-50 focus:outline-none">
-              <Link
-                to="/settings/profile"
-                onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-800"
-              >
-                <User className="w-4 h-4" />
-                Profile
-              </Link>
-              <Link
-                to="/settings/preferences"
-                onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-800"
-              >
-                <Settings className="w-4 h-4" />
-                Settings
-              </Link>
-              <div className="border-t border-slate-100 my-1" />
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-red-50 hover:text-red-600"
-              >
-                <LogOut className="w-4 h-4" />
-                Sign out
-              </button>
-            </div>
-          )}
+        <div className="flex items-center gap-2">
+          <Link
+            to="/expenses/new"
+            className="hidden items-center gap-2 rounded-2xl bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 sm:inline-flex"
+          >
+            <Plus className="h-4 w-4" />
+            Quick add
+          </Link>
+
+          <NotificationBell unreadCount={unreadCount} />
+
+          <div className="relative ml-1">
+            <button
+              onClick={() => setMenuOpen((open) => !open)}
+              className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-2 py-1.5 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-700 text-xs font-bold text-white">
+                {initials}
+              </div>
+              <span className="hidden max-w-32 truncate text-sm font-medium text-slate-700 sm:block">
+                {email}
+              </span>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+            </button>
+
+            {menuOpen && (
+              <div className="absolute right-0 z-50 mt-2 w-56 rounded-2xl border border-slate-200 bg-white py-1.5 shadow-xl shadow-slate-900/10 focus:outline-none">
+                <Link
+                  to="/settings/profile"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-800"
+                >
+                  <User className="h-4 w-4" />
+                  Profile
+                </Link>
+                <Link
+                  to="/settings/preferences"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-800"
+                >
+                  <Settings className="h-4 w-4" />
+                  Settings
+                </Link>
+                <div className="my-1 border-t border-slate-100" />
+                <button
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-red-50 hover:text-red-600"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="hidden items-center justify-between rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex">
+        <div className="text-sm text-slate-500">
+          Stay focused on due items, shared balances, and the next action that matters.
+        </div>
+        <div className="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">
+          Simple household finance
         </div>
       </div>
     </header>
