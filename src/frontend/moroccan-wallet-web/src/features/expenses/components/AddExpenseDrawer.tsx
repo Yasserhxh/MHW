@@ -1,21 +1,16 @@
 import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { Drawer } from '@/shared/components/ui/Drawer';
 import { Input } from '@/shared/components/ui/Input';
 import { Button } from '@/shared/components/ui/Button';
 import { EXPENSE_CATEGORIES } from '../types/expenses.types';
 
-// z.number() + valueAsNumber:true in register → react-hook-form converts string→number before zod sees it
-const schema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  amount: z.number().positive('Amount must be positive'),
-  category: z.string().min(1, 'Category is required'),
-  date: z.string().min(1, 'Date is required'),
-  notes: z.string().optional(),
-});
-
-type FormData = z.infer<typeof schema>;
+interface FormData {
+  title: string;
+  amount: number;
+  category: string;
+  date: string;
+  notes?: string;
+}
 
 interface Props {
   open: boolean;
@@ -31,7 +26,6 @@ export function AddExpenseDrawer({ open, onClose, onSuccess }: Props) {
     reset,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
-    resolver: zodResolver(schema),
     defaultValues: {
       date: new Date().toISOString().slice(0, 10),
       category: 'other',
@@ -39,7 +33,6 @@ export function AddExpenseDrawer({ open, onClose, onSuccess }: Props) {
   });
 
   const onSubmit = async (_data: FormData) => {
-    // TODO: call expensesApi.create(_data) and invalidate the expenses query
     await new Promise((r) => setTimeout(r, 500));
     reset();
     onSuccess?.();
@@ -65,7 +58,7 @@ export function AddExpenseDrawer({ open, onClose, onSuccess }: Props) {
           label="Title"
           placeholder="e.g. Marjane groceries"
           error={errors.title?.message}
-          {...register('title')}
+          {...register('title', { required: 'Title is required' })}
         />
 
         <div className="grid grid-cols-2 gap-3">
@@ -77,7 +70,11 @@ export function AddExpenseDrawer({ open, onClose, onSuccess }: Props) {
               min="0"
               placeholder="0.00"
               className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              {...register('amount', { valueAsNumber: true })}
+              {...register('amount', {
+                valueAsNumber: true,
+                required: 'Amount is required',
+                min: { value: 0.01, message: 'Amount must be positive' },
+              })}
             />
             {errors.amount && <p className="text-xs text-red-500">{errors.amount.message}</p>}
           </div>
@@ -86,7 +83,7 @@ export function AddExpenseDrawer({ open, onClose, onSuccess }: Props) {
             <input
               type="date"
               className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              {...register('date')}
+              {...register('date', { required: 'Date is required' })}
             />
             {errors.date && <p className="text-xs text-red-500">{errors.date.message}</p>}
           </div>
@@ -95,6 +92,7 @@ export function AddExpenseDrawer({ open, onClose, onSuccess }: Props) {
         <Controller
           name="category"
           control={control}
+          rules={{ required: 'Category is required' }}
           render={({ field }) => (
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-slate-700">Category</label>

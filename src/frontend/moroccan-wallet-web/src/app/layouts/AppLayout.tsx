@@ -1,85 +1,33 @@
-import { useState, Fragment } from 'react';
+import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { Dialog, Transition } from '@headlessui/react';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 
-export default function AppLayout() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-const navItems = [
-  ['Dashboard', '/dashboard'],
-  ['Expenses', '/expenses'],
-  ['Shared Expenses', '/shared-expenses'],
-  ['Grocery Prices', '/grocery-prices'],
-  ['Reminders', '/reminders'],
-  ['Notifications', '/notifications'],
-  ['Settings', '/settings/profile'],
-] as const;
+export function AppLayout() {
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
-      {/* Mobile sidebar overlay */}
-      <Transition show={sidebarOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-50 lg:hidden" onClose={setSidebarOpen}>
-          <Transition.Child
-            as={Fragment}
-            enter="transition-opacity ease-linear duration-200"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="transition-opacity ease-linear duration-200"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-black/50" />
-          </Transition.Child>
-export function AppLayout() {
-  const unread = useNotificationsStore((s) => s.unreadCount);
-  const location = useLocation();
-  const email = useAuthStore((s) => s.email);
-
-  return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <h2>Moroccan Household Wallet</h2>
-        {navItems.map(([label, to]) => (
-          <NavLink key={to} className="nav-link" to={to}>{label}</NavLink>
-        ))}
-      </aside>
-      <div className="content">
-        <header className="topbar">
-          <div>
-            <strong>{location.pathname.split('/').filter(Boolean).join(' / ') || 'dashboard'}</strong>
-          <div className="fixed inset-0 flex">
-            <Transition.Child
-              as={Fragment}
-              enter="transition ease-in-out duration-300 transform"
-              enterFrom="-translate-x-full"
-              enterTo="translate-x-0"
-              leave="transition ease-in-out duration-300 transform"
-              leaveFrom="translate-x-0"
-              leaveTo="-translate-x-full"
-            >
-              <Dialog.Panel>
-                <Sidebar onClose={() => setSidebarOpen(false)} />
-              </Dialog.Panel>
-            </Transition.Child>
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-50 flex lg:hidden" role="dialog" aria-modal="true">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
+          <div className="relative h-full">
+            <Sidebar onClose={() => setSidebarOpen(false)} />
           </div>
-        </Dialog>
-      </Transition>
+        </div>
+      )}
 
-      {/* Desktop sidebar — always visible */}
-      <div className="hidden lg:flex flex-shrink-0">
+      <div className="hidden flex-shrink-0 lg:flex">
         <Sidebar />
-          </div>
+      </div>
 
-      {/* Main area */}
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Topbar onMenuClick={() => setSidebarOpen(true)} />
 
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Outlet />
-      </div>
+          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
