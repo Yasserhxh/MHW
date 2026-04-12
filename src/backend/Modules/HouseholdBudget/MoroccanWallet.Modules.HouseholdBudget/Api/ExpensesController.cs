@@ -14,6 +14,7 @@ namespace MoroccanWallet.Modules.HouseholdBudget.Api;
 
 [ApiController]
 [Route("api/v1/expenses")]
+[Route("api/v1/transactions")]
 [Authorize]
 [Produces("application/json")]
 [EnableRateLimiting(RateLimitPolicies.General)]
@@ -37,6 +38,16 @@ public sealed class ExpensesController(IMediator mediator) : ControllerBase
         var result = await mediator.Send(
             new GetExpensesQuery(CurrentUserId, page, Math.Clamp(pageSize, 1, 100), categoryId, from, to, search),
             cancellationToken);
+        return result.ToHttpResult();
+    }
+
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(ExpenseDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IResult> GetById(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new GetExpenseByIdQuery(CurrentUserId, id), cancellationToken);
         return result.ToHttpResult();
     }
 
@@ -65,8 +76,11 @@ public sealed class ExpensesController(IMediator mediator) : ControllerBase
             new CreateExpenseCommand(
                 CurrentUserId,
                 request.CategoryId,
+                request.WalletId,
                 request.Amount,
                 request.Currency,
+                request.Type,
+                request.PaymentMethod,
                 request.Description,
                 request.Notes,
                 request.Date,
@@ -90,8 +104,11 @@ public sealed class ExpensesController(IMediator mediator) : ControllerBase
                 CurrentUserId,
                 id,
                 request.CategoryId,
+                request.WalletId,
                 request.Amount,
                 request.Currency,
+                request.Type,
+                request.PaymentMethod,
                 request.Description,
                 request.Notes,
                 request.Date,
@@ -114,8 +131,11 @@ public sealed class ExpensesController(IMediator mediator) : ControllerBase
 
 public sealed record CreateExpenseRequest(
     Guid? CategoryId,
+    Guid? WalletId,
     decimal Amount,
     string Currency,
+    Domain.Entities.TransactionType Type,
+    string? PaymentMethod,
     string Description,
     string? Notes,
     DateTime Date,
@@ -124,8 +144,11 @@ public sealed record CreateExpenseRequest(
 
 public sealed record UpdateExpenseRequest(
     Guid? CategoryId,
+    Guid? WalletId,
     decimal Amount,
     string Currency,
+    Domain.Entities.TransactionType Type,
+    string? PaymentMethod,
     string Description,
     string? Notes,
     DateTime Date,

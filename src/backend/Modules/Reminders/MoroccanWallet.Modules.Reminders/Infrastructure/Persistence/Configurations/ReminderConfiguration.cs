@@ -20,7 +20,11 @@ public sealed class ReminderConfiguration : IEntityTypeConfiguration<Reminder>
         builder.Property(r => r.UserId).HasColumnName("user_id").IsRequired();
         builder.Property(r => r.Title).HasColumnName("title").HasMaxLength(200).IsRequired();
         builder.Property(r => r.Description).HasColumnName("description").HasMaxLength(2000);
+        builder.Property(r => r.Type).HasColumnName("type")
+            .HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(r => r.Amount).HasColumnName("amount").HasPrecision(18, 2);
         builder.Property(r => r.DueDate).HasColumnName("due_date").IsRequired();
+        builder.Property(r => r.SnoozedUntil).HasColumnName("snoozed_until");
         builder.Property(r => r.Frequency).HasColumnName("frequency")
             .HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(r => r.IsCompleted).HasColumnName("is_completed").IsRequired();

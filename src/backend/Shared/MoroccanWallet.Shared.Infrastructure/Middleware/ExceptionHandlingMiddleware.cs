@@ -38,6 +38,7 @@ public sealed class ExceptionHandlingMiddleware(
             Type = $"https://httpstatuses.com/{statusCode}",
             Detail = statusCode == 500 ? "An unexpected error occurred." : exception.Message
         };
+        problemDetails.Extensions["traceId"] = context.TraceIdentifier;
 
         context.Response.ContentType = "application/problem+json";
         context.Response.StatusCode = statusCode;

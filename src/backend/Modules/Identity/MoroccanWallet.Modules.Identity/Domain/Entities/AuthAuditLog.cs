@@ -18,6 +18,7 @@ public sealed class AuthAuditLog
         Guid? userId,
         string eventType,
         string? ipAddress = null,
+        string? userAgent = null,
         string? metadataJson = null)
     {
         return new AuthAuditLog
@@ -25,6 +26,7 @@ public sealed class AuthAuditLog
             UserId = userId,
             EventType = eventType,
             IpAddress = ipAddress,
+            UserAgent = userAgent,
             MetadataJson = metadataJson,
             CreatedAt = DateTime.UtcNow
         };

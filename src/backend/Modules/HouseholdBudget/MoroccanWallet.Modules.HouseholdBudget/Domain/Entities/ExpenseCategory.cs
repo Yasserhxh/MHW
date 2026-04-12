@@ -2,6 +2,12 @@ using MoroccanWallet.Shared.Kernel.Primitives;
 
 namespace MoroccanWallet.Modules.HouseholdBudget.Domain.Entities;
 
+public enum CategoryType
+{
+    Expense = 1,
+    Income = 2
+}
+
 public sealed class ExpenseCategory : AggregateRoot
 {
     private ExpenseCategory() { }
@@ -10,9 +16,10 @@ public sealed class ExpenseCategory : AggregateRoot
     public string Name { get; private set; } = string.Empty;
     public string Color { get; private set; } = "#6366f1";
     public string Icon { get; private set; } = "tag";
+    public CategoryType Type { get; private set; } = CategoryType.Expense;
     public bool IsDefault { get; private set; }
 
-    public static ExpenseCategory Create(Guid userId, string name, string color, string icon)
+    public static ExpenseCategory Create(Guid userId, string name, string color, string icon, CategoryType type)
     {
         return new ExpenseCategory
         {
@@ -21,24 +28,26 @@ public sealed class ExpenseCategory : AggregateRoot
             Name = name.Trim(),
             Color = color,
             Icon = icon,
+            Type = type,
             IsDefault = false,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
     }
 
-    public static ExpenseCategory CreateDefault(Guid userId, string name, string color, string icon)
+    public static ExpenseCategory CreateDefault(Guid userId, string name, string color, string icon, CategoryType type)
     {
-        var category = Create(userId, name, color, icon);
+        var category = Create(userId, name, color, icon, type);
         category.IsDefault = true;
         return category;
     }
 
-    public void Update(string name, string color, string icon)
+    public void Update(string name, string color, string icon, CategoryType type)
     {
         Name = name.Trim();
         Color = color;
         Icon = icon;
+        Type = type;
         Touch();
     }
 }

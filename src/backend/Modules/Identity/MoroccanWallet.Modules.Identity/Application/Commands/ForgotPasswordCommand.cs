@@ -22,7 +22,8 @@ public sealed class ForgotPasswordCommandValidator : AbstractValidator<ForgotPas
 public sealed class ForgotPasswordCommandHandler(
     IdentityDbContext db,
     ITokenGenerator tokenGenerator,
-    IEmailSender emailSender)
+    IEmailSender emailSender,
+    IAuthAuditLogger auditLogger)
     : ICommandHandler<ForgotPasswordCommand>
 {
     public async Task<Result> Handle(
@@ -36,6 +37,13 @@ public sealed class ForgotPasswordCommandHandler(
 
         if (user is not null && user.IsActive)
         {
+            var activeTokens = await db.PasswordResetTokens
+                .Where(token => token.UserId == user.Id && token.UsedAt == null)
+                .ToListAsync(cancellationToken);
+
+            foreach (var activeToken in activeTokens)
+                activeToken.MarkUsed();
+
             var (rawToken, tokenHash) = tokenGenerator.GenerateSecureToken();
             var resetToken = PasswordResetToken.Create(
                 user.Id, tokenHash, TimeSpan.FromMinutes(15));
@@ -49,6 +57,14 @@ public sealed class ForgotPasswordCommandHandler(
                 HtmlBody: $"<p>Your password reset token: <strong>{rawToken}</strong></p><p>Expires in 15 minutes.</p>",
                 PlainTextBody: $"Password reset token: {rawToken}"),
                 cancellationToken);
+
+            await auditLogger.LogAsync(user.Id, "PasswordResetRequested", cancellationToken: cancellationToken);
+        }
+        else
+        {
+            await auditLogger.LogAsync(null, "PasswordResetRequestedUnknown",
+                metadata: new { email = request.Email },
+                cancellationToken: cancellationToken);
         }
 
         return Result.Success();

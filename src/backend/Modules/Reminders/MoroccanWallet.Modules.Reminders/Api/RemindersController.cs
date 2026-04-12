@@ -38,6 +38,16 @@ public sealed class RemindersController(IMediator mediator) : ControllerBase
         return result.ToHttpResult();
     }
 
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(ReminderDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IResult> GetById(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new GetReminderByIdQuery(CurrentUserId, id), cancellationToken);
+        return result.ToHttpResult();
+    }
+
     [HttpPost]
     [ProducesResponseType(typeof(ReminderCreatedResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
@@ -50,6 +60,8 @@ public sealed class RemindersController(IMediator mediator) : ControllerBase
                 CurrentUserId,
                 request.Title,
                 request.Description,
+                request.Type,
+                request.Amount,
                 request.DueDate,
                 request.Frequency),
             cancellationToken);
@@ -71,6 +83,8 @@ public sealed class RemindersController(IMediator mediator) : ControllerBase
                 id,
                 request.Title,
                 request.Description,
+                request.Type,
+                request.Amount,
                 request.DueDate,
                 request.Frequency),
             cancellationToken);
@@ -84,6 +98,16 @@ public sealed class RemindersController(IMediator mediator) : ControllerBase
     public async Task<IResult> Complete(Guid id, CancellationToken cancellationToken)
     {
         var result = await mediator.Send(new CompleteReminderCommand(CurrentUserId, id), cancellationToken);
+        return result.ToHttpResult();
+    }
+
+    [HttpPost("{id:guid}/snooze")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IResult> Snooze(Guid id, [FromBody] SnoozeReminderRequest request, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new SnoozeReminderCommand(CurrentUserId, id, request.Until), cancellationToken);
         return result.ToHttpResult();
     }
 
@@ -101,11 +125,17 @@ public sealed class RemindersController(IMediator mediator) : ControllerBase
 public sealed record CreateReminderRequest(
     string Title,
     string? Description,
+    ReminderType Type,
+    decimal? Amount,
     DateTime DueDate,
     ReminderFrequency Frequency);
 
 public sealed record UpdateReminderRequest(
     string Title,
     string? Description,
+    ReminderType Type,
+    decimal? Amount,
     DateTime DueDate,
     ReminderFrequency Frequency);
+
+public sealed record SnoozeReminderRequest(DateTime Until);

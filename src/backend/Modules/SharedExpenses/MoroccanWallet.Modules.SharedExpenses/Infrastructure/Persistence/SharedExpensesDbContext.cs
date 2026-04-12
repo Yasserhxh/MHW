@@ -10,6 +10,7 @@ public sealed class SharedExpensesDbContext(DbContextOptions<SharedExpensesDbCon
     public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
     public DbSet<SharedExpense> SharedExpenses => Set<SharedExpense>();
     public DbSet<ExpenseSplit> ExpenseSplits => Set<ExpenseSplit>();
+    public DbSet<Settlement> Settlements => Set<Settlement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

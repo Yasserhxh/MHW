@@ -14,16 +14,14 @@ public sealed class MarkAllReadCommandHandler(NotificationsDbContext db)
         MarkAllReadCommand request,
         CancellationToken cancellationToken)
     {
-        var now = DateTime.UtcNow;
-
-        await db.Notifications
+        var notifications = await db.Notifications
             .Where(n => n.UserId == request.UserId && !n.IsRead)
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(n => n.IsRead, true)
-                    .SetProperty(n => n.ReadAt, now)
-                    .SetProperty(n => n.UpdatedAt, now),
-                cancellationToken);
+            .ToListAsync(cancellationToken);
+
+        foreach (var notification in notifications)
+            notification.MarkRead();
+
+        await db.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

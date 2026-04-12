@@ -11,8 +11,11 @@ namespace MoroccanWallet.Modules.HouseholdBudget.Application.Commands;
 public sealed record CreateExpenseCommand(
     Guid UserId,
     Guid? CategoryId,
+    Guid? WalletId,
     decimal Amount,
     string Currency,
+    TransactionType Type,
+    string? PaymentMethod,
     string Description,
     string? Notes,
     DateTime Date,
@@ -53,11 +56,23 @@ public sealed class CreateExpenseCommandHandler(HouseholdBudgetDbContext db)
                 return Result.Failure<ExpenseCreatedResponse>(HouseholdBudgetErrors.CategoryNotFound);
         }
 
+        if (request.WalletId.HasValue)
+        {
+            var walletExists = await db.Wallets
+                .AnyAsync(w => w.Id == request.WalletId && w.UserId == request.UserId, cancellationToken);
+
+            if (!walletExists)
+                return Result.Failure<ExpenseCreatedResponse>(HouseholdBudgetErrors.WalletNotFound);
+        }
+
         var expense = Expense.Create(
             request.UserId,
             request.CategoryId,
+            request.WalletId,
             request.Amount,
             request.Currency,
+            request.Type,
+            request.PaymentMethod,
             request.Description,
             request.Notes,
             request.Date,

@@ -10,6 +10,8 @@ public sealed record CreateReminderCommand(
     Guid UserId,
     string Title,
     string? Description,
+    ReminderType Type,
+    decimal? Amount,
     DateTime DueDate,
     ReminderFrequency Frequency) : ICommand<ReminderCreatedResponse>;
 
@@ -36,6 +38,8 @@ public sealed class CreateReminderCommandHandler(RemindersDbContext db)
             request.UserId,
             request.Title,
             request.Description,
+            request.Type,
+            request.Amount,
             request.DueDate,
             request.Frequency);
 

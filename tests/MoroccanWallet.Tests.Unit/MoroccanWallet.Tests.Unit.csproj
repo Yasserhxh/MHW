@@ -16,7 +16,6 @@
     </PackageReference>
     <PackageReference Include="FluentAssertions" Version="6.12.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.5" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="NSubstitute" Version="5.3.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
@@ -27,7 +26,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\backend\Modules\GroceryPrices\MoroccanWallet.Modules.GroceryPrices\MoroccanWallet.Modules.GroceryPrices.csproj" />
+    <ProjectReference Include="..\..\src\backend\Modules\HouseholdBudget\MoroccanWallet.Modules.HouseholdBudget\MoroccanWallet.Modules.HouseholdBudget.csproj" />
     <ProjectReference Include="..\..\src\backend\Modules\Identity\MoroccanWallet.Modules.Identity\MoroccanWallet.Modules.Identity.csproj" />
+    <ProjectReference Include="..\..\src\backend\Modules\Notifications\MoroccanWallet.Modules.Notifications\MoroccanWallet.Modules.Notifications.csproj" />
+    <ProjectReference Include="..\..\src\backend\Modules\Reminders\MoroccanWallet.Modules.Reminders\MoroccanWallet.Modules.Reminders.csproj" />
+    <ProjectReference Include="..\..\src\backend\Modules\SharedExpenses\MoroccanWallet.Modules.SharedExpenses\MoroccanWallet.Modules.SharedExpenses.csproj" />
+    <ProjectReference Include="..\..\src\backend\Modules\Users\MoroccanWallet.Modules.Users\MoroccanWallet.Modules.Users.csproj" />
     <ProjectReference Include="..\..\src\backend\Shared\MoroccanWallet.Shared.Kernel\MoroccanWallet.Shared.Kernel.csproj" />
     <ProjectReference Include="..\..\src\backend\Shared\MoroccanWallet.Shared.Infrastructure\MoroccanWallet.Shared.Infrastructure.csproj" />
   </ItemGroup>

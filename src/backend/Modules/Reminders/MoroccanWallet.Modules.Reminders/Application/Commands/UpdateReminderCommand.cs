@@ -13,6 +13,8 @@ public sealed record UpdateReminderCommand(
     Guid ReminderId,
     string Title,
     string? Description,
+    ReminderType Type,
+    decimal? Amount,
     DateTime DueDate,
     ReminderFrequency Frequency) : ICommand;
 
@@ -42,7 +44,7 @@ public sealed class UpdateReminderCommandHandler(RemindersDbContext db)
         if (reminder.UserId != request.UserId)
             return Result.Failure(RemindersErrors.ReminderAccessDenied);
 
-        reminder.Update(request.Title, request.Description, request.DueDate, request.Frequency);
+        reminder.Update(request.Title, request.Description, request.Type, request.Amount, request.DueDate, request.Frequency);
         await db.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }

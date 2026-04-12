@@ -13,7 +13,6 @@ public sealed record UserProfileResponse(
     Guid UserId,
     string DisplayName,
     string? AvatarUrl,
-    string PreferredCurrency,
     string Language,
     string Timezone,
     DateTime CreatedAt);
@@ -32,7 +31,6 @@ public sealed class GetMyProfileQueryHandler(UsersDbContext db)
                 p.UserId,
                 p.DisplayName,
                 p.AvatarUrl,
-                p.PreferredCurrency,
                 p.Language,
                 p.Timezone,
                 p.CreatedAt))

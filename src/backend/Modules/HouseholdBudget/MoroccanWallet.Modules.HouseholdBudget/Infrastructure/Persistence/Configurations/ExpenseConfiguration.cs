@@ -18,8 +18,11 @@ public sealed class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
 
         builder.Property(e => e.UserId).HasColumnName("user_id").IsRequired();
         builder.Property(e => e.CategoryId).HasColumnName("category_id");
+        builder.Property(e => e.WalletId).HasColumnName("wallet_id");
         builder.Property(e => e.Amount).HasColumnName("amount").HasPrecision(18, 2).IsRequired();
         builder.Property(e => e.Currency).HasColumnName("currency").HasMaxLength(10).IsRequired();
+        builder.Property(e => e.Type).HasColumnName("type").HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(e => e.PaymentMethod).HasColumnName("payment_method").HasMaxLength(50);
         builder.Property(e => e.Description).HasColumnName("description").HasMaxLength(500).IsRequired();
         builder.Property(e => e.Notes).HasColumnName("notes").HasMaxLength(2000);
         builder.Property(e => e.Date).HasColumnName("date").IsRequired();

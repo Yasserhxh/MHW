@@ -11,10 +11,10 @@ public sealed class DevEmailSender(ILogger<DevEmailSender> logger) : IEmailSende
     public Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
     {
         logger.LogInformation(
-            "[DEV EMAIL] To: {To} | Subject: {Subject}\n{Body}",
+            "[DEV EMAIL] To: {To} | Subject: {Subject} | BodyLength: {BodyLength}",
             message.To,
             message.Subject,
-            message.PlainTextBody ?? message.HtmlBody);
+            (message.PlainTextBody ?? message.HtmlBody).Length);
 
         return Task.CompletedTask;
     }

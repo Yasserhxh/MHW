@@ -20,7 +20,8 @@ public sealed class VerifyEmailCommandValidator : AbstractValidator<VerifyEmailC
 
 public sealed class VerifyEmailCommandHandler(
     IdentityDbContext db,
-    ITokenGenerator tokenGenerator)
+    ITokenGenerator tokenGenerator,
+    IAuthAuditLogger auditLogger)
     : ICommandHandler<VerifyEmailCommand>
 {
     public async Task<Result> Handle(
@@ -34,12 +35,25 @@ public sealed class VerifyEmailCommandHandler(
             .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, cancellationToken);
 
         if (token is null || !token.IsValid)
+        {
+            await auditLogger.LogAsync(null, "EmailVerificationRejected",
+                metadata: new { reason = "invalid_or_expired_token" },
+                cancellationToken: cancellationToken);
             return Result.Failure(IdentityErrors.InvalidToken);
+        }
 
         token.User.VerifyEmail();
         token.MarkUsed();
 
+        var otherTokens = await db.EmailVerificationTokens
+            .Where(t => t.UserId == token.UserId && t.Id != token.Id && t.UsedAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var otherToken in otherTokens)
+            otherToken.MarkUsed();
+
         await db.SaveChangesAsync(cancellationToken);
+        await auditLogger.LogAsync(token.UserId, "EmailVerified", cancellationToken: cancellationToken);
 
         return Result.Success();
     }

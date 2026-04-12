@@ -10,7 +10,8 @@ public sealed record CreateCategoryCommand(
     Guid UserId,
     string Name,
     string Color,
-    string Icon) : ICommand<CategoryCreatedResponse>;
+    string Icon,
+    CategoryType Type) : ICommand<CategoryCreatedResponse>;
 
 public sealed record CategoryCreatedResponse(Guid Id, string Name);
 
@@ -36,7 +37,8 @@ public sealed class CreateCategoryCommandHandler(HouseholdBudgetDbContext db)
             request.UserId,
             request.Name,
             request.Color,
-            request.Icon);
+            request.Icon,
+            request.Type);
 
         db.ExpenseCategories.Add(category);
         await db.SaveChangesAsync(cancellationToken);

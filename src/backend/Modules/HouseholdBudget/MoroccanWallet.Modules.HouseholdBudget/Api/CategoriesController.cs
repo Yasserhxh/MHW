@@ -13,6 +13,7 @@ namespace MoroccanWallet.Modules.HouseholdBudget.Api;
 
 [ApiController]
 [Route("api/v1/expense-categories")]
+[Route("api/v1/categories")]
 [Authorize]
 [Produces("application/json")]
 [EnableRateLimiting(RateLimitPolicies.General)]
@@ -38,9 +39,24 @@ public sealed class CategoriesController(IMediator mediator) : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await mediator.Send(
-            new CreateCategoryCommand(CurrentUserId, request.Name, request.Color, request.Icon),
+            new CreateCategoryCommand(CurrentUserId, request.Name, request.Color, request.Icon, request.Type),
             cancellationToken);
         return result.ToCreatedResult($"/api/v1/expense-categories/{result.Value?.Id}");
+    }
+
+    [HttpPut("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IResult> Update(
+        Guid id,
+        [FromBody] UpdateCategoryRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(
+            new UpdateCategoryCommand(CurrentUserId, id, request.Name, request.Color, request.Icon, request.Type),
+            cancellationToken);
+        return result.ToHttpResult();
     }
 
     [HttpDelete("{id:guid}")]
@@ -54,4 +70,5 @@ public sealed class CategoriesController(IMediator mediator) : ControllerBase
     }
 }
 
-public sealed record CreateCategoryRequest(string Name, string Color, string Icon);
+public sealed record CreateCategoryRequest(string Name, string Color, string Icon, Domain.Entities.CategoryType Type);
+public sealed record UpdateCategoryRequest(string Name, string Color, string Icon, Domain.Entities.CategoryType Type);

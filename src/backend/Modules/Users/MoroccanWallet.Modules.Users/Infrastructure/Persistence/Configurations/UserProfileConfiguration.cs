@@ -20,9 +20,13 @@ public sealed class UserProfileConfiguration : IEntityTypeConfiguration<UserProf
         builder.Property(p => p.UserId).HasColumnName("user_id").IsRequired();
         builder.Property(p => p.DisplayName).HasColumnName("display_name").HasMaxLength(100).IsRequired();
         builder.Property(p => p.AvatarUrl).HasColumnName("avatar_url").HasMaxLength(2048);
+        builder.Property(p => p.Locale).HasColumnName("locale").HasMaxLength(20).IsRequired();
         builder.Property(p => p.PreferredCurrency).HasColumnName("preferred_currency").HasMaxLength(10).IsRequired();
         builder.Property(p => p.Language).HasColumnName("language").HasMaxLength(10).IsRequired();
         builder.Property(p => p.Timezone).HasColumnName("timezone").HasMaxLength(100).IsRequired();
+        builder.Property(p => p.MonthlyBudgetPreference).HasColumnName("monthly_budget_preference").HasPrecision(18, 2);
+        builder.Property(p => p.SalaryDay).HasColumnName("salary_day");
+        builder.Property(p => p.HouseholdMode).HasColumnName("household_mode").HasMaxLength(20).IsRequired();
         builder.Property(p => p.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(p => p.UpdatedAt).HasColumnName("updated_at").IsRequired();
     }

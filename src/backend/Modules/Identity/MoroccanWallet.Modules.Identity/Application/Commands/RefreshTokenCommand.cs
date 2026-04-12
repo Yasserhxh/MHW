@@ -29,7 +29,12 @@ public sealed class RefreshTokenCommandHandler(
             .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash, cancellationToken);
 
         if (existing is null)
+        {
+            await auditLogger.LogAsync(null, "RefreshRejected",
+                metadata: new { reason = "token_not_found" },
+                cancellationToken: cancellationToken);
             return Result.Failure<LoginResponse>(IdentityErrors.RefreshTokenInvalid);
+        }
 
         // Token was already revoked — this is a reuse attack. Revoke the entire family.
         if (existing.IsRevoked)
@@ -40,11 +45,21 @@ public sealed class RefreshTokenCommandHandler(
         }
 
         if (!existing.IsActive)
+        {
+            await auditLogger.LogAsync(existing.UserId, "RefreshRejected",
+                metadata: new { reason = "token_inactive" },
+                cancellationToken: cancellationToken);
             return Result.Failure<LoginResponse>(IdentityErrors.RefreshTokenInvalid);
+        }
 
         var user = existing.User;
         if (!user.IsActive)
+        {
+            await auditLogger.LogAsync(user.Id, "RefreshRejected",
+                metadata: new { reason = "account_disabled" },
+                cancellationToken: cancellationToken);
             return Result.Failure<LoginResponse>(IdentityErrors.AccountDisabled);
+        }
 
         // Rotate: revoke old, issue new in same family
         var (rawNewToken, newHash) = tokenGenerator.GenerateSecureToken();
@@ -62,6 +77,7 @@ public sealed class RefreshTokenCommandHandler(
         await db.SaveChangesAsync(cancellationToken);
 
         var accessToken = jwtService.GenerateAccessToken(user.Id, user.Email);
+        await auditLogger.LogAsync(user.Id, "RefreshSuccess", cancellationToken: cancellationToken);
 
         return new LoginResponse(
             accessToken.Token,

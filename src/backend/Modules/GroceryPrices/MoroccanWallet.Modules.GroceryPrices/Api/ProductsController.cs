@@ -14,6 +14,7 @@ namespace MoroccanWallet.Modules.GroceryPrices.Api;
 
 [ApiController]
 [Route("api/v1/products")]
+[Route("api/v1/grocery-prices/products")]
 [Authorize]
 [Produces("application/json")]
 [EnableRateLimiting(RateLimitPolicies.General)]
@@ -40,6 +41,7 @@ public sealed class ProductsController(IMediator mediator) : ControllerBase
     }
 
     [HttpGet("{id:guid}/price-history")]
+    [HttpGet("{id:guid}/history")]
     [ProducesResponseType(typeof(PriceHistoryResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IResult> GetPriceHistory(
@@ -86,10 +88,56 @@ public sealed class ProductsController(IMediator mediator) : ControllerBase
         var result = await mediator.Send(new ToggleFavoriteCommand(CurrentUserId, id), cancellationToken);
         return result.ToHttpResult();
     }
+
+    [HttpPost("/api/v1/grocery-prices/entries")]
+    [ProducesResponseType(typeof(PriceEntryCreatedResponse), StatusCodes.Status201Created)]
+    public async Task<IResult> AddEntryRoot([FromBody] AddRootPriceEntryRequest request, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(
+            new AddPriceEntryCommand(CurrentUserId, request.ProductId, request.Price, request.Currency, request.StoreName, request.StoreLocation, request.ObservedAt),
+            cancellationToken);
+        return result.ToCreatedResult($"/api/v1/grocery-prices/entries/{result.Value?.Id}");
+    }
+
+    [HttpGet("/api/v1/grocery-prices/entries")]
+    [ProducesResponseType(typeof(PagedResult<PriceEntryDto>), StatusCodes.Status200OK)]
+    public async Task<IResult> GetEntries(
+        [FromQuery] Guid? productId = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await mediator.Send(new GetPriceEntriesQuery(productId, page, Math.Clamp(pageSize, 1, 100)), cancellationToken);
+        return result.ToHttpResult();
+    }
+
+    [HttpPost("/api/v1/grocery-prices/favorites/{productId:guid}")]
+    [ProducesResponseType(typeof(ToggleFavoriteResponse), StatusCodes.Status200OK)]
+    public async Task<IResult> AddFavorite(Guid productId, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new ToggleFavoriteCommand(CurrentUserId, productId), cancellationToken);
+        return result.ToHttpResult();
+    }
+
+    [HttpDelete("/api/v1/grocery-prices/favorites/{productId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IResult> RemoveFavorite(Guid productId, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new RemoveFavoriteCommand(CurrentUserId, productId), cancellationToken);
+        return result.ToHttpResult();
+    }
 }
 
 public sealed record CreateProductRequest(string Name, string? Category, string? Unit, string? Barcode);
 public sealed record AddPriceEntryRequest(
+    decimal Price,
+    string Currency,
+    string? StoreName,
+    string? StoreLocation,
+    DateTime ObservedAt);
+
+public sealed record AddRootPriceEntryRequest(
+    Guid ProductId,
     decimal Price,
     string Currency,
     string? StoreName,

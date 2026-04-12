@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.RateLimiting;
 using FluentValidation;
@@ -23,7 +24,6 @@ using MoroccanWallet.Shared.Kernel.Primitives;
 using Scalar.AspNetCore;
 using Serilog;
 
-// Bootstrap Serilog early for startup logging
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .CreateBootstrapLogger();
@@ -33,8 +33,8 @@ try
     Log.Information("Starting Moroccan Wallet API (.NET 10)");
 
     var builder = WebApplication.CreateBuilder(args);
+    builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 
-    // ─── Serilog ──────────────────────────────────────────────────────────────
     builder.Host.UseSerilog((ctx, lc) => lc
         .ReadFrom.Configuration(ctx.Configuration)
         .Enrich.FromLogContext()
@@ -43,15 +43,14 @@ try
         .WriteTo.Console(outputTemplate:
             "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}"));
 
-    // ─── Core ASP.NET Core ────────────────────────────────────────────────────
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddHttpContextAccessor();
+    builder.Services.AddProblemDetails();
 
-    // ─── OpenAPI (.NET 10 built-in) + Scalar UI ───────────────────────────────
     builder.Services.AddOpenApi("v1", opts =>
     {
-        opts.AddDocumentTransformer((doc, ctx, ct) =>
+        opts.AddDocumentTransformer((doc, _, _) =>
         {
             doc.Info = new OpenApiInfo
             {
@@ -60,8 +59,8 @@ try
                 Description = "Production-grade household wallet management API"
             };
 
-            // Bearer security scheme (Microsoft.OpenApi 2.0 API)
             doc.Components ??= new OpenApiComponents();
+            doc.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
             doc.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
             {
                 Type = SecuritySchemeType.Http,
@@ -69,11 +68,13 @@ try
                 BearerFormat = "JWT",
                 Description = "Enter JWT access token"
             };
+
+            doc.Security ??= [];
             doc.Security.Add(new OpenApiSecurityRequirement
             {
                 {
                     new OpenApiSecuritySchemeReference("Bearer", doc),
-                    new List<string>()
+                    []
                 }
             });
 
@@ -81,14 +82,20 @@ try
         });
     });
 
-    // ─── JWT Authentication ───────────────────────────────────────────────────
     var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
-    var secretKey = jwtSection["SecretKey"]
-        ?? throw new InvalidOperationException("Jwt:SecretKey not configured.");
+    var secretKey = ResolveJwtSecret(builder.Environment, jwtSection);
 
     if (secretKey.Length < 32)
-        throw new InvalidOperationException(
-            "Jwt:SecretKey must be at least 32 characters (256 bits) for HMAC-SHA256.");
+    {
+        throw new InvalidOperationException("Jwt:SecretKey must be at least 32 characters (256 bits) for HMAC-SHA256.");
+    }
+
+    builder.Services.PostConfigure<JwtOptions>(options =>
+    {
+        options.SecretKey = secretKey;
+        options.Issuer = jwtSection["Issuer"] ?? options.Issuer;
+        options.Audience = jwtSection["Audience"] ?? options.Audience;
+    });
 
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(opts =>
@@ -105,15 +112,18 @@ try
                 ClockSkew = TimeSpan.FromSeconds(30)
             };
 
-            // Allow SignalR to receive token from query string
             opts.Events = new JwtBearerEvents
             {
                 OnMessageReceived = ctx =>
                 {
                     var accessToken = ctx.Request.Query["access_token"];
                     var path = ctx.HttpContext.Request.Path;
+
                     if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                    {
                         ctx.Token = accessToken;
+                    }
+
                     return Task.CompletedTask;
                 }
             };
@@ -121,11 +131,9 @@ try
 
     builder.Services.AddAuthorization();
 
-    // ─── Rate Limiting (.NET built-in) ────────────────────────────────────────
     builder.Services.AddRateLimiter(opts =>
     {
         opts.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-
         opts.OnRejected = async (ctx, token) =>
         {
             ctx.HttpContext.Response.ContentType = "application/problem+json";
@@ -134,79 +142,80 @@ try
                 token);
         };
 
-        // Auth: login — 10 req/min per IP
-        opts.AddFixedWindowLimiter(RateLimitPolicies.Login, policy =>
-        {
-            policy.PermitLimit = 10;
-            policy.Window = TimeSpan.FromMinutes(1);
-            policy.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-            policy.QueueLimit = 0;
-        });
+        opts.AddPolicy(RateLimitPolicies.Login, context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                GetRateLimitPartitionKey(context),
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                    QueueLimit = 0
+                }));
 
-        // Auth: register + forgot-password — 5 req/hour per IP
-        opts.AddFixedWindowLimiter(RateLimitPolicies.AuthSensitive, policy =>
-        {
-            policy.PermitLimit = 5;
-            policy.Window = TimeSpan.FromHours(1);
-            policy.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-            policy.QueueLimit = 0;
-        });
+        opts.AddPolicy(RateLimitPolicies.AuthSensitive, context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                GetRateLimitPartitionKey(context),
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 5,
+                    Window = TimeSpan.FromHours(1),
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                    QueueLimit = 0
+                }));
 
-        // General API — 60 req/min per IP
-        opts.AddFixedWindowLimiter(RateLimitPolicies.General, policy =>
-        {
-            policy.PermitLimit = 60;
-            policy.Window = TimeSpan.FromMinutes(1);
-            policy.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-            policy.QueueLimit = 2;
-        });
+        opts.AddPolicy(RateLimitPolicies.General, context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                GetRateLimitPartitionKey(context),
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 60,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                    QueueLimit = 2
+                }));
 
-        // Global fallback
         opts.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
             RateLimitPartition.GetFixedWindowLimiter(
-                ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                GetRateLimitPartitionKey(ctx),
                 _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = 200,
-                    Window = TimeSpan.FromMinutes(1)
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0
                 }));
     });
 
-    // ─── MediatR + Pipeline Behaviors ────────────────────────────────────────
     builder.Services.AddMediatR(cfg =>
     {
         cfg.RegisterServicesFromAssemblies(
             typeof(IdentityModule).Assembly,
             typeof(NotificationsModule).Assembly,
-            typeof(MoroccanWallet.Modules.Users.UsersModule).Assembly,
-            typeof(MoroccanWallet.Modules.HouseholdBudget.HouseholdBudgetModule).Assembly,
-            typeof(MoroccanWallet.Modules.Reminders.RemindersModule).Assembly,
-            typeof(MoroccanWallet.Modules.SharedExpenses.SharedExpensesModule).Assembly,
-            typeof(MoroccanWallet.Modules.GroceryPrices.GroceryPricesModule).Assembly,
-            typeof(MoroccanWallet.Modules.ReferenceData.ReferenceDataModule).Assembly,
-            typeof(MoroccanWallet.Modules.Administration.AdministrationModule).Assembly
-        );
+            typeof(UsersModule).Assembly,
+            typeof(HouseholdBudgetModule).Assembly,
+            typeof(RemindersModule).Assembly,
+            typeof(SharedExpensesModule).Assembly,
+            typeof(GroceryPricesModule).Assembly,
+            typeof(ReferenceDataModule).Assembly,
+            typeof(AdministrationModule).Assembly);
     });
 
     builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
     builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
-    // ─── FluentValidation ────────────────────────────────────────────────────
     builder.Services.AddValidatorsFromAssemblies([
         typeof(IdentityModule).Assembly,
-        typeof(MoroccanWallet.Modules.Users.UsersModule).Assembly,
-        typeof(MoroccanWallet.Modules.HouseholdBudget.HouseholdBudgetModule).Assembly,
-        typeof(MoroccanWallet.Modules.Reminders.RemindersModule).Assembly,
-        typeof(MoroccanWallet.Modules.SharedExpenses.SharedExpensesModule).Assembly,
-        typeof(MoroccanWallet.Modules.GroceryPrices.GroceryPricesModule).Assembly
+        typeof(UsersModule).Assembly,
+        typeof(HouseholdBudgetModule).Assembly,
+        typeof(RemindersModule).Assembly,
+        typeof(SharedExpensesModule).Assembly,
+        typeof(GroceryPricesModule).Assembly
     ]);
 
-    // ─── Email ───────────────────────────────────────────────────────────────
     var emailProvider = builder.Configuration["Email:Provider"] ?? "dev";
     if (emailProvider.Equals("smtp", StringComparison.OrdinalIgnoreCase))
     {
-        builder.Services.Configure<SmtpOptions>(
-            builder.Configuration.GetSection(SmtpOptions.SectionName));
+        builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.SectionName));
         builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
     }
     else
@@ -214,7 +223,6 @@ try
         builder.Services.AddScoped<IEmailSender, DevEmailSender>();
     }
 
-    // ─── Modules ─────────────────────────────────────────────────────────────
     builder.Services.AddIdentityModule(builder.Configuration);
     builder.Services.AddNotificationsModule(builder.Configuration);
     builder.Services.AddUsersModule(builder.Configuration);
@@ -225,27 +233,23 @@ try
     builder.Services.AddReferenceDataModule(builder.Configuration);
     builder.Services.AddAdministrationModule(builder.Configuration);
 
-    // ─── CORS ────────────────────────────────────────────────────────────────
     builder.Services.AddCors(opts =>
         opts.AddPolicy("AllowFrontend", policy =>
             policy
-                .WithOrigins(
-                    builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-                    ?? ["http://localhost:5173"])
+                .WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? ["http://localhost:5173"])
                 .AllowAnyHeader()
                 .AllowAnyMethod()
-                .AllowCredentials())); // Required for SignalR
+                .AllowCredentials()));
 
-    // ─── Build ───────────────────────────────────────────────────────────────
     var app = builder.Build();
 
-    // ─── Middleware Pipeline ──────────────────────────────────────────────────
     app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseMiddleware<ExceptionHandlingMiddleware>();
+    app.UseStatusCodePages();
 
     if (!app.Environment.IsDevelopment())
     {
-        app.UseHsts(); // Strict-Transport-Security in non-dev environments
+        app.UseHsts();
     }
 
     if (app.Environment.IsDevelopment())
@@ -259,6 +263,7 @@ try
         });
     }
 
+    app.UseHttpsRedirection();
     app.UseSerilogRequestLogging(opts =>
     {
         opts.EnrichDiagnosticContext = (dc, httpCtx) =>
@@ -275,7 +280,6 @@ try
 
     app.MapControllers();
     app.MapNotificationHub();
-
     app.MapGet("/health", () => Results.Ok(new
     {
         status = "healthy",
@@ -284,7 +288,7 @@ try
         runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription
     })).WithTags("Health").AllowAnonymous();
 
-    Log.Information("Moroccan Wallet API started — Scalar UI at /scalar/v1");
+    Log.Information("Moroccan Wallet API started - Scalar UI at /scalar/v1");
     app.Run();
 }
 catch (Exception ex) when (ex is not HostAbortedException)
@@ -294,6 +298,43 @@ catch (Exception ex) when (ex is not HostAbortedException)
 finally
 {
     Log.CloseAndFlush();
+}
+
+static string ResolveJwtSecret(IWebHostEnvironment environment, IConfigurationSection jwtSection)
+{
+    var configuredSecret = jwtSection["SecretKey"];
+    if (!string.IsNullOrWhiteSpace(configuredSecret) && !IsPlaceholder(configuredSecret))
+    {
+        return configuredSecret;
+    }
+
+    if (!environment.IsDevelopment())
+    {
+        throw new InvalidOperationException("Jwt:SecretKey must be configured outside development.");
+    }
+
+    Log.Warning("Jwt:SecretKey is missing or placeholder-based. Using an ephemeral development key for this process.");
+    return Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+}
+
+static bool IsPlaceholder(string value) =>
+    value.Contains("CHANGE_THIS", StringComparison.OrdinalIgnoreCase) ||
+    value.Contains("__SET_", StringComparison.OrdinalIgnoreCase) ||
+    value.Contains("dev-only-secret-key", StringComparison.OrdinalIgnoreCase);
+
+static string GetRateLimitPartitionKey(HttpContext context)
+{
+    var forwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+    if (!string.IsNullOrWhiteSpace(forwardedFor))
+    {
+        var first = forwardedFor.Split(',')[0].Trim();
+        if (!string.IsNullOrWhiteSpace(first))
+        {
+            return first;
+        }
+    }
+
+    return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 }
 
 public partial class Program { }

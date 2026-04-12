@@ -28,7 +28,8 @@ public sealed class ResetPasswordCommandValidator : AbstractValidator<ResetPassw
 public sealed class ResetPasswordCommandHandler(
     IdentityDbContext db,
     IPasswordHasher passwordHasher,
-    ITokenGenerator tokenGenerator)
+    ITokenGenerator tokenGenerator,
+    IAuthAuditLogger auditLogger)
     : ICommandHandler<ResetPasswordCommand>
 {
     public async Task<Result> Handle(
@@ -42,7 +43,12 @@ public sealed class ResetPasswordCommandHandler(
             .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, cancellationToken);
 
         if (token is null || !token.IsValid)
+        {
+            await auditLogger.LogAsync(null, "PasswordResetRejected",
+                metadata: new { reason = "invalid_or_expired_token" },
+                cancellationToken: cancellationToken);
             return Result.Failure(IdentityErrors.InvalidToken);
+        }
 
         var newHash = passwordHasher.Hash(request.NewPassword);
         token.User.UpdatePasswordHash(newHash);
@@ -57,6 +63,7 @@ public sealed class ResetPasswordCommandHandler(
             rt.Revoke("password_reset");
 
         await db.SaveChangesAsync(cancellationToken);
+        await auditLogger.LogAsync(token.UserId, "PasswordResetCompleted", cancellationToken: cancellationToken);
 
         return Result.Success();
     }

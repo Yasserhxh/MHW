@@ -63,10 +63,22 @@ public sealed class LoginCommandHandler(
         }
 
         if (!user.EmailVerified)
+        {
+            await auditLogger.LogAsync(user.Id, "LoginRejected",
+                metadata: new { reason = "email_not_verified" },
+                ipAddress: request.IpAddress,
+                cancellationToken: cancellationToken);
             return Result.Failure<LoginResponse>(IdentityErrors.EmailNotVerified);
+        }
 
         if (!user.IsActive)
+        {
+            await auditLogger.LogAsync(user.Id, "LoginRejected",
+                metadata: new { reason = "account_disabled" },
+                ipAddress: request.IpAddress,
+                cancellationToken: cancellationToken);
             return Result.Failure<LoginResponse>(IdentityErrors.AccountDisabled);
+        }
 
         var accessToken = jwtService.GenerateAccessToken(user.Id, user.Email);
         var (rawRefreshToken, refreshTokenHash) = tokenGenerator.GenerateSecureToken();

@@ -12,7 +12,6 @@ public sealed record UpdateProfileCommand(
     Guid UserId,
     string DisplayName,
     string? AvatarUrl,
-    string PreferredCurrency,
     string Language,
     string Timezone) : ICommand<UserProfileUpdatedResponse>;
 
@@ -27,8 +26,6 @@ public sealed class UpdateProfileCommandValidator : AbstractValidator<UpdateProf
     {
         RuleFor(x => x.DisplayName).NotEmpty().MaximumLength(100);
         RuleFor(x => x.AvatarUrl).MaximumLength(2048).When(x => x.AvatarUrl is not null);
-        RuleFor(x => x.PreferredCurrency).NotEmpty().Must(c => SupportedCurrencies.Contains(c))
-            .WithMessage("Currency must be one of: MAD, EUR, USD, GBP.");
         RuleFor(x => x.Language).NotEmpty().Must(l => SupportedLanguages.Contains(l))
             .WithMessage("Language must be one of: fr, ar, en.");
         RuleFor(x => x.Timezone).NotEmpty().MaximumLength(100);
@@ -52,10 +49,9 @@ public sealed class UpdateProfileCommandHandler(UsersDbContext db)
             db.UserProfiles.Add(profile);
         }
 
-        profile.Update(
+        profile.UpdateProfile(
             request.DisplayName,
             request.AvatarUrl,
-            request.PreferredCurrency,
             request.Language,
             request.Timezone);
 

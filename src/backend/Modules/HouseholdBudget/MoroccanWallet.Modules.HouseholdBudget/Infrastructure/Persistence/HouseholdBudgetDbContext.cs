@@ -7,6 +7,7 @@ public sealed class HouseholdBudgetDbContext(DbContextOptions<HouseholdBudgetDbC
     : DbContext(options)
 {
     public DbSet<Expense> Expenses => Set<Expense>();
+    public DbSet<Wallet> Wallets => Set<Wallet>();
     public DbSet<ExpenseCategory> ExpenseCategories => Set<ExpenseCategory>();
     public DbSet<MonthlyBudget> MonthlyBudgets => Set<MonthlyBudget>();
 

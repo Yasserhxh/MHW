@@ -19,6 +19,7 @@ public sealed class ExpenseCategoryConfiguration : IEntityTypeConfiguration<Expe
         builder.Property(c => c.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
         builder.Property(c => c.Color).HasColumnName("color").HasMaxLength(20).IsRequired();
         builder.Property(c => c.Icon).HasColumnName("icon").HasMaxLength(50).IsRequired();
+        builder.Property(c => c.Type).HasColumnName("type").HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(c => c.IsDefault).HasColumnName("is_default").IsRequired();
         builder.Property(c => c.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(c => c.UpdatedAt).HasColumnName("updated_at").IsRequired();

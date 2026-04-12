@@ -56,6 +56,7 @@ public sealed class NotificationsController(IMediator mediator) : ControllerBase
     }
 
     [HttpPost("read-all")]
+    [HttpPost("mark-all-read")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IResult> MarkAllRead(CancellationToken cancellationToken)
     {

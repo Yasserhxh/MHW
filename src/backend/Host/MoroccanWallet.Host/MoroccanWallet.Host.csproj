@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>MoroccanWallet.Host-6b8b9940-662d-4a97-a884-ec2f5231673c</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

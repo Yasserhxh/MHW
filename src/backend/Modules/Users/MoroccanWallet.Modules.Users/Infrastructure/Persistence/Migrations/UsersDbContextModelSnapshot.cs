@@ -45,17 +45,38 @@ namespace MoroccanWallet.Modules.Users.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("display_name");
 
+                    b.Property<string>("HouseholdMode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("household_mode");
+
                     b.Property<string>("Language")
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
                         .HasColumnName("language");
 
+                    b.Property<string>("Locale")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("locale");
+
+                    b.Property<decimal?>("MonthlyBudgetPreference")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("monthly_budget_preference");
+
                     b.Property<string>("PreferredCurrency")
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
                         .HasColumnName("preferred_currency");
+
+                    b.Property<int?>("SalaryDay")
+                        .HasColumnType("integer")
+                        .HasColumnName("salary_day");
 
                     b.Property<string>("Timezone")
                         .IsRequired()

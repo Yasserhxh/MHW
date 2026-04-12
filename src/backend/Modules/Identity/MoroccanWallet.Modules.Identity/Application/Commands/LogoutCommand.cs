@@ -14,7 +14,8 @@ public sealed record LogoutCommand(string RefreshToken, Guid CallerUserId) : ICo
 public sealed class LogoutCommandHandler(
     IdentityDbContext db,
     ITokenGenerator tokenGenerator,
-    ILogger<LogoutCommandHandler> logger)
+    ILogger<LogoutCommandHandler> logger,
+    IAuthAuditLogger auditLogger)
     : ICommandHandler<LogoutCommand>
 {
     public async Task<Result> Handle(
@@ -35,11 +36,15 @@ public sealed class LogoutCommandHandler(
             logger.LogWarning(
                 "Logout ownership mismatch: caller {CallerId} attempted to revoke token belonging to {OwnerId}",
                 request.CallerUserId, token.UserId);
+            await auditLogger.LogAsync(request.CallerUserId, "LogoutOwnershipMismatch",
+                metadata: new { ownerUserId = token.UserId },
+                cancellationToken: cancellationToken);
             return Result.Success();
         }
 
         token.Revoke("logout");
         await db.SaveChangesAsync(cancellationToken);
+        await auditLogger.LogAsync(request.CallerUserId, "LogoutSuccess", cancellationToken: cancellationToken);
 
         return Result.Success();
     }
@@ -47,7 +52,9 @@ public sealed class LogoutCommandHandler(
 
 public sealed record LogoutAllCommand(Guid UserId) : ICommand;
 
-public sealed class LogoutAllCommandHandler(IdentityDbContext db)
+public sealed class LogoutAllCommandHandler(
+    IdentityDbContext db,
+    IAuthAuditLogger auditLogger)
     : ICommandHandler<LogoutAllCommand>
 {
     public async Task<Result> Handle(
@@ -62,6 +69,9 @@ public sealed class LogoutAllCommandHandler(IdentityDbContext db)
             token.Revoke("logout_all");
 
         await db.SaveChangesAsync(cancellationToken);
+        await auditLogger.LogAsync(request.UserId, "LogoutAllSuccess",
+            metadata: new { revokedSessions = tokens.Count },
+            cancellationToken: cancellationToken);
 
         return Result.Success();
     }

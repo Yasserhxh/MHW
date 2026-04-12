@@ -87,6 +87,68 @@ namespace MoroccanWallet.Modules.SharedExpenses.Infrastructure.Persistence.Migra
                     b.ToTable("group_members", "shared_expenses");
                 });
 
+            modelBuilder.Entity("MoroccanWallet.Modules.SharedExpenses.Domain.Entities.Settlement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("currency");
+
+                    b.Property<Guid>("FromUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("from_user_id");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("group_id");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<Guid>("RecordedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recorded_by_user_id");
+
+                    b.Property<DateTime>("SettledOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("settled_on");
+
+                    b.Property<Guid>("ToUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("to_user_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId")
+                        .HasDatabaseName("ix_settlements_group_id");
+
+                    b.HasIndex("GroupId", "SettledOn")
+                        .HasDatabaseName("ix_settlements_group_settled_on");
+
+                    b.ToTable("settlements", "shared_expenses");
+                });
+
             modelBuilder.Entity("MoroccanWallet.Modules.SharedExpenses.Domain.Entities.SharedExpense", b =>
                 {
                     b.Property<Guid>("Id")

@@ -18,8 +18,12 @@ public sealed record ExpenseSummaryDto(
     Guid Id,
     Guid? CategoryId,
     string? CategoryName,
+    Guid? WalletId,
+    string? WalletName,
     decimal Amount,
     string Currency,
+    string Type,
+    string? PaymentMethod,
     string Description,
     DateTime Date,
     bool IsRecurring,
@@ -56,7 +60,7 @@ public sealed class GetExpensesQueryHandler(HouseholdBudgetDbContext db)
             .ThenByDescending(e => e.CreatedAt)
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
-            .Select(e => new { e.Id, e.CategoryId, e.Amount, e.Currency, e.Description, e.Date, e.IsRecurring, e.Tags, e.CreatedAt })
+            .Select(e => new { e.Id, e.CategoryId, e.WalletId, e.Amount, e.Currency, Type = e.Type.ToString(), e.PaymentMethod, e.Description, e.Date, e.IsRecurring, e.Tags, e.CreatedAt })
             .ToListAsync(cancellationToken);
 
         var categoryIds = pagedExpenses
@@ -74,12 +78,31 @@ public sealed class GetExpensesQueryHandler(HouseholdBudgetDbContext db)
                 .ToDictionaryAsync(c => c.Id, c => c.Name, cancellationToken);
         }
 
+        var walletIds = pagedExpenses
+            .Where(e => e.WalletId.HasValue)
+            .Select(e => e.WalletId!.Value)
+            .Distinct()
+            .ToList();
+
+        Dictionary<Guid, string> walletNames = [];
+        if (walletIds.Count > 0)
+        {
+            walletNames = await db.Wallets
+                .AsNoTracking()
+                .Where(w => walletIds.Contains(w.Id))
+                .ToDictionaryAsync(w => w.Id, w => w.Name, cancellationToken);
+        }
+
         var items = pagedExpenses.Select(e => new ExpenseSummaryDto(
             e.Id,
             e.CategoryId,
             e.CategoryId.HasValue && categoryNames.TryGetValue(e.CategoryId.Value, out var name) ? name : null,
+            e.WalletId,
+            e.WalletId.HasValue && walletNames.TryGetValue(e.WalletId.Value, out var walletName) ? walletName : null,
             e.Amount,
             e.Currency,
+            e.Type,
+            e.PaymentMethod,
             e.Description,
             e.Date,
             e.IsRecurring,

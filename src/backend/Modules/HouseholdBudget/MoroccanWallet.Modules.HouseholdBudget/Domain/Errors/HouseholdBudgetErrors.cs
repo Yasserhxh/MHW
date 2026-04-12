@@ -18,4 +18,13 @@ public static class HouseholdBudgetErrors
 
     public static readonly Error CategoryAccessDenied =
         new("Budget.CategoryAccessDenied", "You do not have access to this category.", ErrorType.Forbidden);
+
+    public static readonly Error WalletNotFound =
+        new("Budget.WalletNotFound", "Wallet not found.", ErrorType.NotFound);
+
+    public static readonly Error WalletAccessDenied =
+        new("Budget.WalletAccessDenied", "You do not have access to this wallet.", ErrorType.Forbidden);
+
+    public static readonly Error BudgetNotFound =
+        new("Budget.MonthlyBudgetNotFound", "Monthly budget not found.", ErrorType.NotFound);
 }
