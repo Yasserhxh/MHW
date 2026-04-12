@@ -4,14 +4,11 @@ import { router } from './router';
 import { useAuthStore } from '../features/auth/store/auth.store';
 import { useNotificationRealtime } from '../features/notifications/hooks/useNotificationRealtime';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      staleTime: 30_000,
-    },
-  },
-});
+function RealtimeBootstrap() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  useNotificationRealtime(isAuthenticated);
+  return null;
+}
 
 export default function App() {
   return (

@@ -1,5 +1,3 @@
-import { Fragment } from 'react';
-import { Dialog, Transition } from '@headlessui/react';
 import { X } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 
@@ -20,62 +18,32 @@ const sizes = {
 };
 
 export function Modal({ open, onClose, title, children, size = 'md', footer }: ModalProps) {
-  return (
-    <Transition appear show={open} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
-        <Transition.Child
-          as={Fragment}
-          enter="ease-out duration-200"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-150"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
-        </Transition.Child>
+  if (!open) return null;
 
-        <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-200"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-150"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-            >
-              <Dialog.Panel
-                className={cn(
-                  'w-full bg-white rounded-2xl shadow-xl overflow-hidden',
-                  sizes[size]
-                )}
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className={cn('relative w-full bg-white rounded-2xl shadow-xl overflow-hidden', sizes[size])}>
+          {title && (
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h2 className="text-base font-semibold text-slate-800">{title}</h2>
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
               >
-                {title && (
-                  <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-                    <Dialog.Title className="text-base font-semibold text-slate-800">
-                      {title}
-                    </Dialog.Title>
-                    <button
-                      onClick={onClose}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-                <div className="px-6 py-5">{children}</div>
-                {footer && (
-                  <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
-                    {footer}
-                  </div>
-                )}
-              </Dialog.Panel>
-            </Transition.Child>
-          </div>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+          <div className="px-6 py-5">{children}</div>
+          {footer && (
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              {footer}
+            </div>
+          )}
         </div>
-      </Dialog>
-    </Transition>
+      </div>
+    </div>
   );
 }
