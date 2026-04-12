@@ -6,75 +6,158 @@ import type {
   ResetPasswordRequest,
   VerifyEmailRequest,
 } from '../types/auth.types';
+import { getMockDb, updateMockDb } from '@/shared/mocks/mockDb';
+import { withMockLatency, withMockTask } from '@/shared/mocks/mockApi';
 
-const MOCK_LATENCY_MS = 250;
+function buildAuthResponse(email: string): LoginResponse {
+  const db = getMockDb();
+  const user = db.users.find((item) => item.email.toLowerCase() === email.toLowerCase());
+  if (!user) {
+    throw new Error('Account not found');
+  }
 
-function mockResponse<T>(data: T): Promise<{ data: T }> {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve({ data }), MOCK_LATENCY_MS);
-  });
+  const onboarding = db.onboarding[user.id];
+  return {
+    accessToken: `mock-access-${user.id}`,
+    refreshToken: `mock-refresh-${user.id}`,
+    userId: user.id,
+    email: user.email,
+    fullName: user.fullName,
+    onboardingCompleted: onboarding?.completed ?? false,
+    emailVerified: user.emailVerified,
+  };
 }
 
 export const authApi = {
   register: (payload: RegisterRequest) => {
-    // Real API (disabled during UI/layout development):
-    // return apiClient.post('/auth/register', payload);
-    void payload;
-    return mockResponse({ message: 'Mock register success' });
+    return withMockTask(() => {
+      const db = getMockDb();
+      const exists = db.users.some((user) => user.email.toLowerCase() === payload.email.toLowerCase());
+      if (exists) {
+        throw new Error('An account with this email already exists.');
+      }
+      if (payload.password !== payload.confirmPassword) {
+        throw new Error('Passwords do not match.');
+      }
+      if (!payload.acceptTerms) {
+        throw new Error('You must accept the terms to continue.');
+      }
+
+      updateMockDb((current) => {
+        const id = `user-${Date.now()}`;
+        return {
+          ...current,
+          currentUserId: id,
+          users: [
+            ...current.users,
+            {
+              id,
+              fullName: payload.fullName,
+              email: payload.email,
+              password: payload.password,
+              emailVerified: false,
+            },
+          ],
+          onboarding: {
+            ...current.onboarding,
+            [id]: {
+              completed: false,
+              fullName: payload.fullName,
+              language: 'fr-MA',
+              currency: 'MAD',
+              timezone: 'Africa/Casablanca',
+              householdMode: 'just-me',
+            },
+          },
+          preferences: {
+            ...current.preferences,
+            [id]: {
+              currency: 'MAD',
+              defaultWalletId: 'wallet-main',
+              dashboardCompactMode: false,
+              householdDefaults: 'just-me',
+              notifications: {
+                reminderInApp: true,
+                reminderEmail: true,
+                sharedExpenseInApp: true,
+                budgetWarningInApp: true,
+                weeklyDigestEmail: false,
+              },
+            },
+          },
+        };
+      });
+
+      return { message: 'Registration successful. Please verify your email.' };
+    }, 280);
   },
 
   login: (payload: LoginRequest) => {
-    // Real API (disabled during UI/layout development):
-    // return apiClient.post<LoginResponse>('/auth/login', payload);
-    return mockResponse<LoginResponse>({
-      accessToken: 'mock-access-token',
-      refreshToken: 'mock-refresh-token',
-      user: {
-        id: 'mock-user-id',
-        email: payload.email,
-      },
-    });
+    return withMockTask(() => {
+      const db = getMockDb();
+      const user = db.users.find((item) => item.email.toLowerCase() === payload.email.toLowerCase());
+      if (!user || user.password !== payload.password) {
+        throw new Error('Invalid email or password.');
+      }
+
+      return buildAuthResponse(payload.email);
+    }, 220);
   },
 
   refresh: (refreshToken: string) => {
-    // Real API (disabled during UI/layout development):
-    // return apiClient.post('/auth/refresh', { refreshToken });
-    void refreshToken;
-    return mockResponse({ accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token' });
+    const db = getMockDb();
+    const userId = refreshToken.split('-').slice(-1)[0] || db.currentUserId;
+    return withMockLatency({ accessToken: `mock-access-${userId}`, refreshToken }, 120);
   },
 
   forgotPassword: (payload: ForgotPasswordRequest) => {
-    // Real API (disabled during UI/layout development):
-    // return apiClient.post('/auth/forgot-password', payload);
-    void payload;
-    return mockResponse({ message: 'Mock forgot-password email sent' });
+    return withMockTask(() => {
+      const db = getMockDb();
+      const exists = db.users.some((user) => user.email.toLowerCase() === payload.email.toLowerCase());
+      if (!exists) {
+        throw new Error('No account was found for that email.');
+      }
+      return { message: 'Password reset instructions sent.', resetToken: 'mock-reset-token' };
+    }, 180);
   },
 
   resetPassword: (payload: ResetPasswordRequest) => {
-    // Real API (disabled during UI/layout development):
-    // return apiClient.post('/auth/reset-password', payload);
-    void payload;
-    return mockResponse({ message: 'Mock password reset success' });
+    return withMockTask(() => {
+      if (!payload.token) {
+        throw new Error('Reset token is missing.');
+      }
+      updateMockDb((current) => ({
+        ...current,
+        users: current.users.map((user) =>
+          user.id === current.currentUserId ? { ...user, password: payload.newPassword } : user
+        ),
+      }));
+      return { message: 'Password updated successfully.' };
+    }, 180);
   },
 
   verifyEmail: (payload: VerifyEmailRequest) => {
-    // Real API (disabled during UI/layout development):
-    // return apiClient.post('/auth/verify-email', payload);
-    void payload;
-    return mockResponse({ message: 'Mock email verified' });
+    return withMockTask(() => {
+      if (!payload.token) {
+        throw new Error('Verification token is missing.');
+      }
+      updateMockDb((current) => ({
+        ...current,
+        users: current.users.map((user) =>
+          user.id === current.currentUserId ? { ...user, emailVerified: true } : user
+        ),
+      }));
+      return { message: 'Email verified successfully.' };
+    }, 180);
   },
 
   logout: (refreshToken: string, accessToken?: string) => {
-    // Real API (disabled during UI/layout development):
-    // return apiClient.post('/auth/logout', { refreshToken });
     void refreshToken;
     void accessToken;
-    return mockResponse({ message: 'Mock logout success' });
+    return withMockLatency({ message: 'Logged out.' }, 120);
   },
 
   logoutAll: () => {
-    // Real API (disabled during UI/layout development):
-    // return apiClient.post('/auth/logout-all');
-    return mockResponse({ message: 'Mock logout all success' });
+    return withMockLatency({ message: 'All sessions cleared.' }, 120);
   },
 };

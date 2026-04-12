@@ -1,6 +1,8 @@
 import {
   LayoutDashboard,
   Receipt,
+  WalletCards,
+  Tags,
   Users,
   ShoppingCart,
   AlarmClock,
@@ -18,6 +20,8 @@ export interface NavItem {
 export const mainNav: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Expenses', href: '/expenses', icon: Receipt },
+  { label: 'Wallets', href: '/wallets', icon: WalletCards },
+  { label: 'Categories', href: '/categories', icon: Tags },
   { label: 'Shared Expenses', href: '/shared-expenses', icon: Users },
   { label: 'Grocery Prices', href: '/grocery-prices', icon: ShoppingCart },
   { label: 'Reminders', href: '/reminders', icon: AlarmClock },

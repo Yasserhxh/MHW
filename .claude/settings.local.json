@@ -15,7 +15,11 @@
       "Bash(powershell -Command '[System.Reflection.Assembly]::LoadFile\\('\\\\''__TRACKED_VAR__/Microsoft.OpenApi.dll'\\\\''\\).GetExportedTypes\\(\\) | Select-Object -First 30 | ForEach-Object { $_.FullName }')",
       "Bash(powershell:*)",
       "Bash(node -e \"const z = require\\('./node_modules/zod'\\); console.log\\(z.version ?? require\\('./node_modules/zod/package.json'\\).version\\)\")",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(grep -E \"\\\\.\\(json|csproj\\)$\")",
+      "Bash(bash /tmp/explore.sh)",
+      "Bash(wc -l /c/Users/YasserBOUAABANE/source/repos/MHW/src/backend/**/*.cs)",
+      "Bash(find /c/Users/YasserBOUAABANE/source/repos/MHW/src/backend -name \"*.cs\" ! -path \"*/obj/*\" ! -path \"*/bin/*\" -exec wc -l {} +)"
     ]
   }
 }

@@ -48,8 +48,12 @@ public sealed class LoginCommandHandler(
         var user = await db.Users
             .FirstOrDefaultAsync(u => u.EmailNormalized == emailNormalized, cancellationToken);
 
-        // Constant-time safe: always hash even if user not found to prevent timing attacks
-        if (user is null || !passwordHasher.Verify(request.Password, user.PasswordHash))
+        // VerifyWithFallback always runs BCrypt even when user is null so that the
+        // response time is indistinguishable between "no such user" and "wrong password",
+        // preventing timing-based account enumeration attacks.
+        var passwordValid = passwordHasher.VerifyWithFallback(request.Password, user?.PasswordHash);
+
+        if (user is null || !passwordValid)
         {
             await auditLogger.LogAsync(null, "LoginFailed",
                 metadata: new { email = request.Email, reason = "invalid_credentials" },

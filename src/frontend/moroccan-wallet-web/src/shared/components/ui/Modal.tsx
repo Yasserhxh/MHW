@@ -20,16 +20,20 @@ const sizes = {
 export function Modal({ open, onClose, title, children, size = 'md', footer }: ModalProps) {
   if (!open) return null;
 
+  const titleId = title ? 'app-modal-title' : undefined;
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="flex min-h-full items-center justify-center p-4">
         <div className={cn('relative w-full bg-white rounded-2xl shadow-xl overflow-hidden', sizes[size])}>
           {title && (
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="text-base font-semibold text-slate-800">{title}</h2>
+              <h2 id={titleId} className="text-base font-semibold text-slate-800">{title}</h2>
               <button
                 onClick={onClose}
+                type="button"
+                aria-label="Close modal"
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
               >
                 <X className="w-4 h-4" />

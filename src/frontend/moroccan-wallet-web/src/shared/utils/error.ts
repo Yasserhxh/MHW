@@ -2,6 +2,10 @@ import type { AxiosError } from 'axios';
 import type { ApiError, ProblemDetails } from '../types/api';
 
 export function normalizeApiError(error: unknown): ApiError {
+  if (error instanceof Error) {
+    return { message: error.message };
+  }
+
   const axiosError = error as AxiosError<ProblemDetails>;
   if (axiosError.response) {
     return {

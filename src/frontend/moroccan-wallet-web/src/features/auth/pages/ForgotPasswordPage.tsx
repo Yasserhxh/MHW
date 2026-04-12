@@ -1,23 +1,46 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AuthCard } from '../components/AuthCard';
 import { authApi } from '../api/auth.api';
-import { useAuthSubmit } from '../hooks/useAuthSubmit';
+import { Input } from '@/shared/components/ui/Input';
+import { Button } from '@/shared/components/ui/Button';
+import { normalizeApiError } from '@/shared/utils/error';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
-  const { loading, error, success, run } = useAuthSubmit(authApi.forgotPassword);
+  const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   return (
-    <AuthCard title="Forgot password" subtitle="We will send password reset instructions.">
-      <form className="form-grid" onSubmit={(e) => {
-        e.preventDefault();
-        run({ email }, 'If the email exists, reset instructions were sent.');
-      }}>
-        <input className="input" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        {error ? <span style={{ color: 'var(--danger)' }}>{error}</span> : null}
-        {success ? <span style={{ color: 'var(--success)' }}>{success}</span> : null}
-        <button className="btn btn-primary" disabled={loading}>{loading ? 'Sending...' : 'Send reset link'}</button>
-      </form>
-    </AuthCard>
+    <div className="mx-auto max-w-xl py-10">
+      <AuthCard title="Forgot password" subtitle="We will simulate a reset email and let you continue with the mock token flow.">
+        <form
+          className="space-y-4"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            setLoading(true);
+            setError('');
+            setSuccess('');
+            try {
+              await authApi.forgotPassword({ email });
+              setSuccess('Reset instructions sent. Use token "mock-reset-token" on the next screen.');
+            } catch (err) {
+              setError(normalizeApiError(err).message);
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          <Input label="Email" value={email} onChange={(event) => setEmail(event.target.value)} />
+          {error ? <div className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
+          {success ? <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{success}</div> : null}
+          <Button type="submit" className="w-full" loading={loading}>Send reset instructions</Button>
+        </form>
+        <div className="mt-6 text-sm text-slate-500">
+          Remembered your password? <Link to="/login" className="text-teal-700">Back to login</Link>
+        </div>
+      </AuthCard>
+    </div>
   );
 }

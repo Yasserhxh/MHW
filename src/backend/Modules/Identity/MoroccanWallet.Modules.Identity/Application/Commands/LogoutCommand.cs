@@ -1,16 +1,20 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using MoroccanWallet.Modules.Identity.Application.Services;
 using MoroccanWallet.Modules.Identity.Infrastructure.Persistence;
 using MoroccanWallet.Shared.Kernel.Application;
 using MoroccanWallet.Shared.Kernel.Errors;
-using Microsoft.EntityFrameworkCore;
 
 namespace MoroccanWallet.Modules.Identity.Application.Commands;
 
-public sealed record LogoutCommand(string RefreshToken) : ICommand;
+/// <param name="RefreshToken">Raw refresh token to revoke.</param>
+/// <param name="CallerUserId">Authenticated user performing the logout — enforces ownership.</param>
+public sealed record LogoutCommand(string RefreshToken, Guid CallerUserId) : ICommand;
 
 public sealed class LogoutCommandHandler(
     IdentityDbContext db,
-    ITokenGenerator tokenGenerator)
+    ITokenGenerator tokenGenerator,
+    ILogger<LogoutCommandHandler> logger)
     : ICommandHandler<LogoutCommand>
 {
     public async Task<Result> Handle(
@@ -21,11 +25,21 @@ public sealed class LogoutCommandHandler(
         var token = await db.RefreshTokens
             .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash, cancellationToken);
 
-        if (token is not null && !token.IsRevoked)
+        if (token is null || token.IsRevoked)
+            return Result.Success(); // idempotent — already gone or never existed
+
+        // Ownership check: prevent one user from revoking another user's session.
+        // Return success silently to avoid confirming token existence to the caller.
+        if (token.UserId != request.CallerUserId)
         {
-            token.Revoke("logout");
-            await db.SaveChangesAsync(cancellationToken);
+            logger.LogWarning(
+                "Logout ownership mismatch: caller {CallerId} attempted to revoke token belonging to {OwnerId}",
+                request.CallerUserId, token.UserId);
+            return Result.Success();
         }
+
+        token.Revoke("logout");
+        await db.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

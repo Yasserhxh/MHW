@@ -113,8 +113,11 @@ public sealed class AuthController(IMediator mediator) : ControllerBase
         [FromBody] LogoutRequest request,
         CancellationToken cancellationToken)
     {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub")!);
+
         var result = await mediator.Send(
-            new LogoutCommand(request.RefreshToken),
+            new LogoutCommand(request.RefreshToken, userId),
             cancellationToken);
 
         return result.ToHttpResult();

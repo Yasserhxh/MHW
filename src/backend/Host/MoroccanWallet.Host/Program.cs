@@ -86,6 +86,10 @@ try
     var secretKey = jwtSection["SecretKey"]
         ?? throw new InvalidOperationException("Jwt:SecretKey not configured.");
 
+    if (secretKey.Length < 32)
+        throw new InvalidOperationException(
+            "Jwt:SecretKey must be at least 32 characters (256 bits) for HMAC-SHA256.");
+
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(opts =>
         {
@@ -236,7 +240,13 @@ try
     var app = builder.Build();
 
     // ─── Middleware Pipeline ──────────────────────────────────────────────────
+    app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHsts(); // Strict-Transport-Security in non-dev environments
+    }
 
     if (app.Environment.IsDevelopment())
     {

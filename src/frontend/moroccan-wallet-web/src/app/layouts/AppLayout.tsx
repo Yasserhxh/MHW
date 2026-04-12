@@ -9,6 +9,12 @@ export function AppLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
+      <a
+        href="#app-main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-xl focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-slate-900"
+      >
+        Skip to main content
+      </a>
       <Transition show={sidebarOpen} as={Fragment}>
         <Dialog as="div" className="relative z-50 lg:hidden" onClose={setSidebarOpen}>
           <Transition.Child
@@ -50,7 +56,7 @@ export function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Topbar onMenuClick={() => setSidebarOpen(true)} />
 
-        <main className="flex-1 overflow-y-auto">
+        <main id="app-main-content" className="flex-1 overflow-y-auto" tabIndex={-1}>
           <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
             <Outlet />
           </div>

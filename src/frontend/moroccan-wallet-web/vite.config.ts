@@ -4,6 +4,17 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
+    globals: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      include: ['src/app/router/**/*.tsx', 'src/features/**/*.{ts,tsx}'],
+      exclude: ['src/**/types/**', 'src/**/*.d.ts', 'src/**/pages/**'],
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

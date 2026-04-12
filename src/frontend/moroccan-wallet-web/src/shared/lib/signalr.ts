@@ -1,11 +1,3 @@
-import {
-  HubConnection,
-  HubConnectionBuilder,
-  HubConnectionState,
-  LogLevel,
-} from '@microsoft/signalr';
-import { authStore } from '../../features/auth/store/auth.store';
-
 type NotificationPayload = {
   id: string;
   kind?: string;
@@ -15,6 +7,7 @@ type NotificationPayload = {
   actionUrl?: string;
   isRead?: boolean;
 };
+
 type EventMap = {
   ReceiveNotification: NotificationPayload;
   UnreadCountChanged: number;
@@ -25,73 +18,27 @@ type ConnectionState = 'Disconnected' | 'Connected';
 class NotificationConnection {
   public state: ConnectionState = 'Disconnected';
   private listeners: { [K in keyof EventMap]?: Set<(payload: EventMap[K]) => void> } = {};
-  private connection: HubConnection | null = null;
-  private initialized = false;
-
-  private createConnection() {
-    const baseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
-
-    return new HubConnectionBuilder()
-      .withUrl(`${baseUrl}/hubs/notifications`, {
-        accessTokenFactory: () => authStore.getState().accessToken ?? '',
-      })
-      .withAutomaticReconnect([0, 2000, 5000, 10000])
-      .configureLogging(LogLevel.Error)
-      .build();
-  }
-
-  private registerHandlers(connection: HubConnection) {
-    if (this.initialized) {
-      return;
-    }
-
-    connection.on('ReceiveNotification', (payload: NotificationPayload) => {
-      this.emit('ReceiveNotification', payload);
-    });
-
-    connection.on('UnreadCountChanged', (payload: number) => {
-      this.emit('UnreadCountChanged', payload);
-    });
-
-    connection.onreconnecting(() => {
-      this.state = 'Disconnected';
-    });
-
-    connection.onreconnected(() => {
-      this.state = 'Connected';
-    });
-
-    connection.onclose(() => {
-      this.state = 'Disconnected';
-    });
-
-    this.initialized = true;
-  }
+  private timer: number | null = null;
 
   async start() {
     if (this.state === 'Connected') return;
-    if (!authStore.getState().accessToken) return;
+    this.state = 'Connected';
 
-    try {
-      if (!this.connection) {
-        this.connection = this.createConnection();
-        this.registerHandlers(this.connection);
-      }
-
-      if (this.connection.state === HubConnectionState.Disconnected) {
-        await this.connection.start();
-      }
-
-      this.state = 'Connected';
-    } catch {
-      this.state = 'Disconnected';
-    }
+    this.timer = window.setInterval(() => {
+      const payload: NotificationPayload = {
+        id: `live-${Date.now()}`,
+        title: 'Live household update',
+        message: 'Mock realtime notification received.',
+        createdAt: new Date().toISOString(),
+        kind: 'system',
+      };
+      this.emit('ReceiveNotification', payload);
+    }, 45000);
   }
 
   async stop() {
-    if (this.connection && this.connection.state !== HubConnectionState.Disconnected) {
-      await this.connection.stop();
-    }
+    if (this.timer) window.clearInterval(this.timer);
+    this.timer = null;
     this.state = 'Disconnected';
   }
 
