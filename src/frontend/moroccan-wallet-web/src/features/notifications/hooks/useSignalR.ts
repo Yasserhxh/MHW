@@ -4,7 +4,7 @@ import {
   startNotificationConnection,
   stopNotificationConnection,
   getNotificationConnection,
-} from '@/lib/signalr';
+} from '@/shared/lib/signalr';
 
 interface UseSignalROptions {
   onNotification?: (notification: unknown) => void;
