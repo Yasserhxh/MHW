@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Fragment, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Outlet } from 'react-router-dom';
@@ -9,6 +10,11 @@ export function AppLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-50 flex lg:hidden" role="dialog" aria-modal="true">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
+          <div className="relative h-full">
+            <Sidebar onClose={() => setSidebarOpen(false)} />
       {/* Mobile sidebar overlay */}
       <Transition show={sidebarOpen} as={Fragment}>
         <Dialog as="div" className="relative z-50 lg:hidden" onClose={setSidebarOpen}>
@@ -39,8 +45,8 @@ export function AppLayout() {
               </Dialog.Panel>
             </Transition.Child>
           </div>
-        </Dialog>
-      </Transition>
+        </div>
+      )}
 
       {/* Desktop sidebar */}
       <div className="hidden flex-shrink-0 lg:flex">
