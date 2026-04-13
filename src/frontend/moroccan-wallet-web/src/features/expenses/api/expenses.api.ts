@@ -1,128 +1,182 @@
 import { apiClient } from '@/shared/api/client';
-import { getMockDb, updateMockDb } from '@/shared/mocks/mockDb';
-import { withMockLatency } from '@/shared/mocks/mockApi';
-import type { CreateExpenseRequest, ExpensesSnapshot, ExpenseTransactionListItem } from '../types/expenses.types';
+import type { PagedResult } from '@/shared/types/api';
+import type {
+  CreateExpenseRequest,
+  ExpenseCategoryBreakdown,
+  ExpenseDetail,
+  ExpensesSnapshot,
+  ExpenseTransactionListItem,
+  PaymentMethodOption,
+} from '../types/expenses.types';
 
-function mapCategoryId(categoryId: string): ExpenseTransactionListItem['category'] {
-  const mapping: Record<string, ExpenseTransactionListItem['category']> = {
-    'cat-groceries': 'groceries',
-    'cat-transport': 'transport',
-    'cat-utilities': 'utilities',
-    'cat-rent': 'housing',
-    'cat-health': 'health',
-    'cat-school': 'education',
-    'cat-salary': 'salary',
-    'cat-freelance': 'salary',
-  };
-  return mapping[categoryId] ?? 'other';
+type ExpenseSummaryResponse = {
+  year: number;
+  month: number;
+  totalSpent: number;
+  totalBudget: number;
+  byCategory: Array<{
+    categoryId?: string | null;
+    categoryName: string;
+    total: number;
+    budget: number;
+    count: number;
+  }>;
+};
+
+type ExpenseDto = {
+  id: string;
+  categoryId?: string | null;
+  categoryName?: string | null;
+  walletId?: string | null;
+  walletName?: string | null;
+  amount: number;
+  currency: string;
+  type: string;
+  paymentMethod?: string | null;
+  description: string;
+  date: string;
+  isRecurring: boolean;
+  tags?: string | null;
+  createdAt: string;
+};
+
+type WalletDto = {
+  id: string;
+  name: string;
+};
+
+type CategoryDto = {
+  id: string;
+  name: string;
+};
+
+function toPaymentMethodId(paymentMethod?: string | null) {
+  return (paymentMethod?.trim().toLowerCase().replace(/\s+/g, '-') || 'cash') as string;
 }
 
-function mapWalletId(walletId: string): ExpenseTransactionListItem['walletId'] {
-  const mapping: Record<string, ExpenseTransactionListItem['walletId']> = {
-    'wallet-main': 'main-wallet',
-    'wallet-cash': 'cash',
-    'wallet-household': 'joint-wallet',
-    'wallet-savings': 'savings-wallet',
-  };
-  return mapping[walletId] ?? 'main-wallet';
+function toPaymentMethodLabel(paymentMethodId: string) {
+  return paymentMethodId
+    .split('-')
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
 }
 
-function mapPaymentMethodId(paymentMethod: string): ExpenseTransactionListItem['paymentMethodId'] {
-  const normalized = paymentMethod.toLowerCase().replace(/\s+/g, '-');
-  if (normalized === 'bank-transfer' || normalized === 'wallet-transfer' || normalized === 'cash') {
-    return normalized;
+function toTransactionItem(expense: ExpenseDto): ExpenseTransactionListItem {
+  const paymentMethodId = toPaymentMethodId(expense.paymentMethod);
+
+  return {
+    id: expense.id,
+    title: expense.description,
+    amount: expense.amount,
+    currency: expense.currency,
+    type: expense.type.toLowerCase() === 'income' ? 'income' : 'expense',
+    category: expense.categoryId ?? 'uncategorized',
+    walletId: expense.walletId ?? 'unassigned',
+    paymentMethodId,
+    date: expense.date,
+    notes: expense.tags ?? undefined,
+    createdAt: expense.createdAt,
+    dateLabel: expense.date.slice(0, 10),
+    categoryLabel: expense.categoryName ?? 'Uncategorized',
+    walletLabel: expense.walletName ?? 'Unassigned',
+    paymentMethodLabel: toPaymentMethodLabel(paymentMethodId),
+  };
+}
+
+function buildCategoryBreakdown(summary: ExpenseSummaryResponse): ExpenseCategoryBreakdown[] {
+  const max = summary.byCategory.reduce((acc, item) => Math.max(acc, item.total), 0);
+
+  return summary.byCategory.map((item) => ({
+    category: item.categoryId ?? item.categoryName.toLowerCase().replace(/\s+/g, '-'),
+    label: item.categoryName,
+    amount: item.total,
+    percent: max > 0 ? Math.max(8, Math.round((item.total / max) * 100)) : 0,
+  }));
+}
+
+function buildPaymentMethods(items: ExpenseTransactionListItem[]): PaymentMethodOption[] {
+  const map = new Map<string, PaymentMethodOption>();
+
+  for (const item of items) {
+    if (!map.has(item.paymentMethodId)) {
+      map.set(item.paymentMethodId, {
+        id: item.paymentMethodId,
+        label: item.paymentMethodLabel,
+      });
+    }
   }
-  return 'card';
+
+  if (!map.size) {
+    map.set('cash', { id: 'cash', label: 'Cash' });
+  }
+
+  return Array.from(map.values());
 }
 
 export const expensesApi = {
-  getSnapshot: async (): Promise<{ data: ExpensesSnapshot }> => {
-    void apiClient;
-    const db = getMockDb();
-    const transactions = db.transactions.map((transaction) => ({
-      ...transaction,
-      category: mapCategoryId(transaction.categoryId),
-      walletId: mapWalletId(transaction.walletId),
-      paymentMethodId: mapPaymentMethodId(transaction.paymentMethod),
-      dateLabel: transaction.date,
-      categoryLabel: db.categories.find((item) => item.id === transaction.categoryId)?.name ?? 'Other',
-      walletLabel: db.wallets.find((item) => item.id === transaction.walletId)?.name ?? 'Wallet',
-      paymentMethodLabel: transaction.paymentMethod,
-    })) as ExpenseTransactionListItem[];
-    const monthTransactions = db.transactions.filter((item) => item.date.startsWith('2026-04'));
-    const expenses = monthTransactions.filter((item) => item.type === 'expense');
-    const income = monthTransactions.filter((item) => item.type === 'income');
-    const categoryTotals = expenses.reduce<Record<string, number>>((acc, tx) => {
-      acc[tx.categoryId] = (acc[tx.categoryId] ?? 0) + tx.amount;
-      return acc;
-    }, {});
-    const totalExpense = expenses.reduce((sum, item) => sum + item.amount, 0);
+  getSnapshot: async () => {
+    const [summaryResponse, transactionsResponse, walletsResponse, categoriesResponse] = await Promise.all([
+      apiClient.get<ExpenseSummaryResponse>('/transactions/summary'),
+      apiClient.get<PagedResult<ExpenseDto>>('/transactions', { params: { page: 1, pageSize: 100 } }),
+      apiClient.get<WalletDto[]>('/wallets'),
+      apiClient.get<CategoryDto[]>('/categories'),
+    ]);
 
-    return withMockLatency({
+    const transactions = transactionsResponse.data.items.map(toTransactionItem);
+    const categoryBreakdown = buildCategoryBreakdown(summaryResponse.data);
+    const incomeThisMonth = transactions
+      .filter((item) => item.type === 'income')
+      .reduce((sum, item) => sum + item.amount, 0);
+
+    const data: ExpensesSnapshot = {
       summary: {
-        spentThisMonth: totalExpense,
-        incomeThisMonth: income.reduce((sum, item) => sum + item.amount, 0),
-        transactionCount: monthTransactions.length,
-        topCategoryLabel: Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0]
-          ? db.categories.find((item) => item.id === Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0][0])?.name ?? 'Other'
-          : 'No category yet',
+        spentThisMonth: summaryResponse.data.totalSpent,
+        incomeThisMonth,
+        transactionCount: transactionsResponse.data.total,
+        topCategoryLabel: categoryBreakdown[0]?.label ?? 'No categories yet',
       },
       transactions,
-      categoryBreakdown: Object.entries(categoryTotals).map(([categoryId, amount]) => ({
-        category: mapCategoryId(categoryId),
-        label: db.categories.find((item) => item.id === categoryId)?.name ?? 'Other',
-        amount,
-        percent: totalExpense ? Math.round((amount / totalExpense) * 100) : 0,
-      })).sort((a, b) => b.amount - a.amount),
-      wallets: db.wallets.map((wallet) => ({ id: mapWalletId(wallet.id), label: wallet.name })),
-      paymentMethods: [
-        { id: 'card' as const, label: 'Card' },
-        { id: 'bank-transfer' as const, label: 'Bank transfer' },
-        { id: 'cash' as const, label: 'Cash' },
-        { id: 'wallet-transfer' as const, label: 'Wallet transfer' },
-      ],
-    } satisfies ExpensesSnapshot, 220);
+      categoryBreakdown,
+      categories: categoriesResponse.data.map((category) => ({
+        id: category.id,
+        label: category.name,
+      })),
+      wallets: walletsResponse.data.map((wallet) => ({
+        id: wallet.id,
+        label: wallet.name,
+      })),
+      paymentMethods: buildPaymentMethods(transactions),
+    };
+
+    return { data };
   },
-  create: async (payload: CreateExpenseRequest): Promise<{ data: ExpenseTransactionListItem }> => {
-    void apiClient;
-    const next = updateMockDb((db) => {
-      const paymentMethodLabel = payload.paymentMethodId === 'bank-transfer'
-        ? 'Bank transfer'
-        : payload.paymentMethodId === 'wallet-transfer'
-          ? 'Wallet transfer'
-          : payload.paymentMethodId === 'cash'
-            ? 'Cash'
-            : 'Card';
-      return {
-        ...db,
-        transactions: [
-          {
-            id: `tx-${Date.now()}`,
-            type: payload.type,
-            title: payload.title,
-            amount: payload.amount,
-            currency: 'MAD',
-            categoryId: payload.category,
-            walletId: payload.walletId,
-            paymentMethod: paymentMethodLabel,
-            date: payload.date,
-            notes: payload.notes,
-            createdAt: new Date().toISOString(),
-          },
-          ...db.transactions,
-        ],
-      };
+
+  getById: async (id: string) => {
+    const { data } = await apiClient.get<ExpenseDto>(`/transactions/${id}`);
+    return {
+      data: {
+        ...toTransactionItem(data),
+        isRecurring: data.isRecurring,
+        tags: data.tags ?? undefined,
+      } satisfies ExpenseDetail,
+    };
+  },
+
+  create: async (payload: CreateExpenseRequest) => {
+    const { data } = await apiClient.post<{ id: string }>('/transactions', {
+      categoryId: payload.category === 'uncategorized' ? null : payload.category,
+      walletId: payload.walletId === 'unassigned' ? null : payload.walletId,
+      amount: payload.amount,
+      currency: 'MAD',
+      type: payload.type,
+      paymentMethod: payload.paymentMethodId,
+      description: payload.title,
+      notes: payload.notes ?? null,
+      date: payload.date,
+      isRecurring: false,
+      tags: payload.notes ?? null,
     });
-    const tx = next.transactions[0];
-    return withMockLatency({
-      ...tx,
-      category: mapCategoryId(tx.categoryId),
-      walletId: mapWalletId(tx.walletId),
-      paymentMethodId: payload.paymentMethodId,
-      dateLabel: tx.date,
-      categoryLabel: next.categories.find((item) => item.id === tx.categoryId)?.name ?? 'Other',
-      walletLabel: next.wallets.find((item) => item.id === tx.walletId)?.name ?? 'Wallet',
-      paymentMethodLabel: tx.paymentMethod,
-    } as ExpenseTransactionListItem, 220);
+
+    return { data };
   },
 };

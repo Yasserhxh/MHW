@@ -108,8 +108,8 @@ export default function ExpensesPage() {
             onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value as ExpenseFilters['category'] }))}
           >
             <option value="all">All categories</option>
-            {data.categoryBreakdown.map((category) => (
-              <option key={category.category} value={category.category}>
+            {data.categories.map((category) => (
+              <option key={category.id} value={category.id}>
                 {category.label}
               </option>
             ))}
@@ -207,6 +207,7 @@ export default function ExpensesPage() {
       <AddExpenseDrawer
         open={isQuickAddOpen}
         onClose={() => setQuickAddOpen(false)}
+        categories={data.categories}
         wallets={data.wallets}
         paymentMethods={data.paymentMethods}
         submitting={createExpense.isPending}

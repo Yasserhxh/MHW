@@ -26,14 +26,28 @@ export default function SharedExpensesPage() {
   const { data, isLoading, isError, refetch } = useSharedExpensesOverview();
   const addExpense = useAddSharedExpense();
   const [open, setOpen] = useState(false);
-  const { register, handleSubmit } = useForm<SharedExpenseForm>({ defaultValues: { title: '', amount: 0, categoryId: 'cat-groceries', paidByMemberId: 'member-1', participantIds: ['member-1', 'member-2', 'member-3'], date: new Date().toISOString().slice(0, 10), notes: '' } });
+  const { register, handleSubmit } = useForm<SharedExpenseForm>({
+    defaultValues: {
+      title: '',
+      amount: 0,
+      categoryId: '',
+      paidByMemberId: '',
+      participantIds: [],
+      date: new Date().toISOString().slice(0, 10),
+      notes: '',
+    },
+  });
 
   if (isLoading) return <LoadingState message="Loading household balances..." />;
   if (isError || !data) return <ErrorState message="Could not load shared expenses." onRetry={() => void refetch()} />;
 
   return (
     <div className="space-y-6">
-      <AppPageHeader title="Shared expenses" subtitle="Keep household costs transparent and make balances easy to understand." action={<QuickAddButton label="Add shared expense" to="/shared-expenses/new" />} />
+      <AppPageHeader
+        title="Shared expenses"
+        subtitle="Keep household costs transparent and make balances easy to understand."
+        action={<QuickAddButton label="Add shared expense" to="/shared-expenses/new" />}
+      />
       <div className="grid gap-6 lg:grid-cols-2">
         <SectionCard title="Member balances">
           <div className="space-y-3">
@@ -50,13 +64,21 @@ export default function SharedExpensesPage() {
         </SectionCard>
         <SectionCard title="Settlement history">
           <div className="space-y-3">
-            {data.settlements.map((settlement) => (
-              <div key={settlement.id} className="rounded-2xl border border-slate-200 p-4 text-sm text-slate-600">
-                <div className="font-semibold text-slate-900">{settlement.fromMemberId} settled with {settlement.toMemberId}</div>
-                <div className="mt-1">{settlement.date}</div>
-                <CurrencyAmount amount={settlement.amount} className="mt-2" />
+            {data.settlements.length ? (
+              data.settlements.map((settlement) => (
+                <div key={settlement.id} className="rounded-2xl border border-slate-200 p-4 text-sm text-slate-600">
+                  <div className="font-semibold text-slate-900">
+                    {settlement.fromName} settled with {settlement.toName}
+                  </div>
+                  <div className="mt-1">{settlement.settledAt}</div>
+                  <CurrencyAmount amount={settlement.amount} className="mt-2" />
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+                Settlement history will appear here as soon as the backend exposes settlement queries.
               </div>
-            ))}
+            )}
           </div>
         </SectionCard>
       </div>
@@ -67,7 +89,9 @@ export default function SharedExpensesPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-slate-900">{expense.title}</div>
-                  <div className="mt-1 text-sm text-slate-500">{expense.date} · paid by {expense.paidByMemberId}</div>
+                  <div className="mt-1 text-sm text-slate-500">
+                    {expense.date} · paid by {expense.paidByMemberId}
+                  </div>
                 </div>
                 <CurrencyAmount amount={expense.amount} />
               </div>
@@ -75,11 +99,42 @@ export default function SharedExpensesPage() {
           ))}
         </div>
       </SectionCard>
-      <Drawer open={open} onClose={() => setOpen(false)} title="Add shared expense" footer={<><Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button><Button form="shared-form" type="submit" loading={addExpense.isPending}>Save</Button></>}>
-        <form id="shared-form" className="space-y-4" onSubmit={handleSubmit(async (values) => { await addExpense.mutateAsync(values); setOpen(false); })}>
+      <Drawer
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Add shared expense"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button form="shared-form" type="submit" loading={addExpense.isPending}>
+              Save
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="shared-form"
+          className="space-y-4"
+          onSubmit={handleSubmit(async (values) => {
+            await addExpense.mutateAsync({
+              title: values.title,
+              amount: values.amount,
+              paidByUserId: values.paidByMemberId || data.members[0]?.userId || '',
+              participantIds: values.participantIds.length ? values.participantIds : data.members.map((member) => member.userId),
+              date: values.date,
+              notes: values.notes,
+              splitType: 'equal',
+            });
+            setOpen(false);
+          })}
+        >
           <Input label="Title" {...register('title')} />
           <Input label="Amount" type="number" {...register('amount', { valueAsNumber: true })} />
+          <Input label="Paid by user id" {...register('paidByMemberId')} />
           <Input label="Date" type="date" {...register('date')} />
+          <Input label="Notes" {...register('notes')} />
         </form>
       </Drawer>
     </div>

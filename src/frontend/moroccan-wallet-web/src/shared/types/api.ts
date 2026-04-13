@@ -11,3 +11,10 @@ export type ApiError = {
   status?: number;
   validation?: Record<string, string[]>;
 };
+
+export type PagedResult<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+};

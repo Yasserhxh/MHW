@@ -1,10 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../api/settings.api';
-import type { UserPreferences } from '@/shared/mocks/appData';
 
 type ProfilePayload = { fullName: string; email: string; language: string; timezone: string };
-type PreferencePayload = Partial<Pick<UserPreferences, 'currency' | 'defaultWalletId' | 'salaryDay' | 'dashboardCompactMode' | 'householdDefaults'>>;
-type NotificationSettingsPayload = Partial<UserPreferences['notifications']>;
+type PreferencePayload = {
+  currency?: string;
+  defaultWalletId?: string;
+  salaryDay?: number;
+  dashboardCompactMode?: boolean;
+  householdDefaults?: string;
+};
+type NotificationSettingsPayload = {
+  reminderInApp?: boolean;
+  reminderEmail?: boolean;
+  sharedExpenseInApp?: boolean;
+  budgetWarningInApp?: boolean;
+  weeklyDigestEmail?: boolean;
+};
 
 const key = ['settings'] as const;
 

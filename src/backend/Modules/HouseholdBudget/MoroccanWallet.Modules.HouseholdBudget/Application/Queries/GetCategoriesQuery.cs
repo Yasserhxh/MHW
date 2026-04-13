@@ -7,7 +7,7 @@ namespace MoroccanWallet.Modules.HouseholdBudget.Application.Queries;
 
 public sealed record GetCategoriesQuery(Guid UserId) : IQuery<IReadOnlyList<CategoryDto>>;
 
-public sealed record CategoryDto(Guid Id, string Name, string Color, string Icon, bool IsDefault);
+public sealed record CategoryDto(Guid Id, string Name, string Color, string Icon, string Type, bool IsDefault);
 
 public sealed class GetCategoriesQueryHandler(HouseholdBudgetDbContext db)
     : IQueryHandler<GetCategoriesQuery, IReadOnlyList<CategoryDto>>
@@ -21,7 +21,7 @@ public sealed class GetCategoriesQueryHandler(HouseholdBudgetDbContext db)
             .Where(c => c.UserId == request.UserId)
             .OrderBy(c => c.IsDefault ? 0 : 1)
             .ThenBy(c => c.Name)
-            .Select(c => new CategoryDto(c.Id, c.Name, c.Color, c.Icon, c.IsDefault))
+            .Select(c => new CategoryDto(c.Id, c.Name, c.Color, c.Icon, c.Type.ToString(), c.IsDefault))
             .ToListAsync(cancellationToken);
 
         return categories;

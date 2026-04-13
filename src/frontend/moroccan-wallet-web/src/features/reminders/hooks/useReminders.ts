@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { remindersApi } from '../api/reminders.api';
-import type { ReminderRecord } from '@/shared/mocks/appData';
+import type { CreateReminderRequest } from '../types/reminders.types';
 
 const key = ['reminders'] as const;
 
@@ -15,7 +15,7 @@ export function useReminder(id?: string) {
 export function useSaveReminder() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, payload }: { id?: string; payload: Omit<ReminderRecord, 'id'> }) => (await remindersApi.save(payload, id)).data,
+    mutationFn: async ({ id, payload }: { id?: string; payload: CreateReminderRequest }) => (await remindersApi.save(payload, id)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: key }),
   });
 }

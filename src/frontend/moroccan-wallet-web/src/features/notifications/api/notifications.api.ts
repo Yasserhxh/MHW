@@ -1,36 +1,42 @@
-import { getMockDb, updateMockDb } from '@/shared/mocks/mockDb';
-import { withMockTask } from '@/shared/mocks/mockApi';
+import { apiClient } from '@/shared/api/client';
+import type { PagedResult } from '@/shared/types/api';
+import type { AppNotification } from '../types/notifications.types';
+
+type NotificationDto = {
+  id: string;
+  type: string;
+  title: string;
+  body?: string | null;
+  isRead: boolean;
+  readAt?: string | null;
+  createdAt: string;
+};
+
+function toNotification(item: NotificationDto): AppNotification {
+  return {
+    id: item.id,
+    kind: (item.type?.toLowerCase().replace(/\s+/g, '_') || 'system') as AppNotification['kind'],
+    title: item.title,
+    message: item.body ?? '',
+    isRead: item.isRead,
+    createdAt: item.createdAt,
+    actionUrl: '/notifications',
+  };
+}
 
 export const notificationsApi = {
-  list: () => withMockTask(() => getMockDb().notifications, 120),
-  markRead: (id: string) =>
-    withMockTask(() => {
-      updateMockDb((db) => ({
-        ...db,
-        notifications: db.notifications.map((item) => (item.id === id ? { ...item, isRead: true } : item)),
-      }));
-      return true;
-    }, 100),
-  markAllRead: () =>
-    withMockTask(() => {
-      updateMockDb((db) => ({
-        ...db,
-        notifications: db.notifications.map((item) => ({ ...item, isRead: true })),
-      }));
-      return true;
-    }, 100),
-  pushMockNotification: () =>
-    withMockTask(() => {
-      const created = {
-        id: `n-${Date.now()}`,
-        kind: 'system' as const,
-        title: 'Mock realtime update',
-        message: 'A new in-app notification just arrived.',
-        createdAt: new Date().toISOString(),
-        isRead: false,
-        actionUrl: '/notifications',
-      };
-      updateMockDb((db) => ({ ...db, notifications: [created, ...db.notifications] }));
-      return created;
-    }, 100),
+  list: async () => {
+    const { data } = await apiClient.get<PagedResult<NotificationDto>>('/notifications', {
+      params: { page: 1, pageSize: 50 },
+    });
+    return { data: data.items.map(toNotification) };
+  },
+
+  unreadCount: async () => {
+    return apiClient.get<{ count: number }>('/notifications/unread-count');
+  },
+
+  markRead: (id: string) => apiClient.post(`/notifications/${id}/read`),
+
+  markAllRead: () => apiClient.post('/notifications/mark-all-read'),
 };

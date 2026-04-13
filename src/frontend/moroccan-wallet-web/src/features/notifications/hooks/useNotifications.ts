@@ -13,6 +13,5 @@ export function useNotificationActions() {
   return {
     markRead: useMutation({ mutationFn: async (id: string) => (await notificationsApi.markRead(id)).data, onSuccess: invalidate }),
     markAllRead: useMutation({ mutationFn: async () => (await notificationsApi.markAllRead()).data, onSuccess: invalidate }),
-    emitMock: useMutation({ mutationFn: async () => (await notificationsApi.pushMockNotification()).data, onSuccess: invalidate }),
   };
 }

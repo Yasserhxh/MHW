@@ -1,8 +1,10 @@
 export interface HouseholdMember {
+  id: string;
   userId: string;
   name: string;
   email: string;
-  balance: number; // positive = owed money, negative = owes money
+  balance: number;
+  role: string;
 }
 
 export interface SharedExpense {
@@ -10,23 +12,32 @@ export interface SharedExpense {
   title: string;
   amount: number;
   currency: string;
-  paidByUserId: string;
-  paidByName: string;
+  paidByMemberId: string;
   date: string;
+  participantIds: string[];
   splitType: 'equal' | 'custom';
-  participants: { userId: string; name: string; share: number }[];
   settled: boolean;
   createdAt: string;
+  notes?: string;
+}
+
+export interface SharedExpensesOverview {
+  groupId: string | null;
+  members: HouseholdMember[];
+  settlements: Settlement[];
+  sharedExpenses: SharedExpense[];
 }
 
 export interface CreateSharedExpenseRequest {
   title: string;
   amount: number;
-  currency: string;
+  currency?: string;
   paidByUserId: string;
   date: string;
   splitType: 'equal' | 'custom';
   participantIds: string[];
+  categoryId?: string;
+  notes?: string;
 }
 
 export interface Settlement {

@@ -1,18 +1,8 @@
 export type TransactionType = 'expense' | 'income';
 
-export type ExpenseCategory =
-  | 'groceries'
-  | 'transport'
-  | 'utilities'
-  | 'housing'
-  | 'health'
-  | 'salary'
-  | 'education'
-  | 'entertainment'
-  | 'other';
-
-export type WalletId = 'main-wallet' | 'cash' | 'joint-wallet' | 'savings-wallet';
-export type PaymentMethodId = 'card' | 'bank-transfer' | 'cash' | 'wallet-transfer';
+export type ExpenseCategory = string;
+export type WalletId = string;
+export type PaymentMethodId = string;
 
 export interface ExpenseTransaction {
   id: string;
@@ -35,6 +25,11 @@ export interface ExpenseTransactionListItem extends ExpenseTransaction {
   paymentMethodLabel: string;
 }
 
+export interface ExpenseDetail extends ExpenseTransactionListItem {
+  isRecurring: boolean;
+  tags?: string;
+}
+
 export interface ExpenseSummary {
   spentThisMonth: number;
   incomeThisMonth: number;
@@ -47,6 +42,11 @@ export interface ExpenseCategoryBreakdown {
   label: string;
   amount: number;
   percent: number;
+}
+
+export interface CategoryOption {
+  id: ExpenseCategory;
+  label: string;
 }
 
 export interface WalletOption {
@@ -71,6 +71,7 @@ export interface ExpensesSnapshot {
   summary: ExpenseSummary;
   transactions: ExpenseTransactionListItem[];
   categoryBreakdown: ExpenseCategoryBreakdown[];
+  categories: CategoryOption[];
   wallets: WalletOption[];
   paymentMethods: PaymentMethodOption[];
 }
@@ -85,15 +86,3 @@ export interface CreateExpenseRequest {
   date: string;
   notes?: string;
 }
-
-export const EXPENSE_CATEGORIES: Array<{ value: ExpenseCategory; label: string }> = [
-  { value: 'groceries', label: 'Groceries' },
-  { value: 'transport', label: 'Transport' },
-  { value: 'utilities', label: 'Utilities' },
-  { value: 'housing', label: 'Housing' },
-  { value: 'health', label: 'Health' },
-  { value: 'salary', label: 'Salary' },
-  { value: 'education', label: 'Education' },
-  { value: 'entertainment', label: 'Entertainment' },
-  { value: 'other', label: 'Other' },
-];

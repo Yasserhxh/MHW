@@ -26,10 +26,10 @@ export default function ProfileSettingsPage() {
     <div className="space-y-6">
       <AppPageHeader title="Profile settings" subtitle="Update your personal account information." />
       <SectionCard title="Profile">
-        <form className="space-y-4" onSubmit={handleSubmit(async (values) => { await saveProfile.mutateAsync(values); setProfile({ fullName: values.fullName, email: values.email }); })}>
+        <form className="space-y-4" onSubmit={handleSubmit(async (values) => { await saveProfile.mutateAsync(values); setProfile({ fullName: values.fullName }); })}>
           <div className="grid gap-4 sm:grid-cols-2">
             <Input label="Full name" {...register('fullName')} />
-            <Input label="Email" {...register('email')} />
+            <Input label="Email" disabled {...register('email')} />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Input label="Language" {...register('language')} />

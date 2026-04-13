@@ -1,41 +1,100 @@
-import { getMockDb, updateMockDb } from '@/shared/mocks/mockDb';
-import { withMockTask } from '@/shared/mocks/mockApi';
+import { apiClient } from '@/shared/api/client';
+import type { PagedResult } from '@/shared/types/api';
 import type { WalletPayload, WalletView } from '../types/wallets.types';
 
-function toWalletView(id: string): WalletView {
-  const db = getMockDb();
-  const wallet = db.wallets.find((item) => item.id === id);
-  if (!wallet) {
-    throw new Error('Wallet not found');
+type WalletDto = {
+  id: string;
+  name: string;
+  type: string;
+  currency: string;
+  currentBalance: number;
+  color?: string | null;
+  icon?: string | null;
+  isArchived: boolean;
+};
+
+type TransactionDto = {
+  id: string;
+  walletId?: string | null;
+};
+
+function normalizeWalletType(type: string): WalletPayload['type'] {
+  const value = type.toLowerCase();
+  if (value === 'sharedhousehold' || value === 'shared-household') {
+    return 'shared-household';
   }
+  if (value === 'cash' || value === 'bank' || value === 'savings') {
+    return value;
+  }
+  return 'bank';
+}
+
+function toWalletView(wallet: WalletDto, transactionCount: number): WalletView {
   return {
-    ...wallet,
-    transactionCount: db.transactions.filter((tx) => tx.walletId === wallet.id).length,
+    id: wallet.id,
+    name: wallet.name,
+    type: normalizeWalletType(wallet.type),
+    currency: wallet.currency,
+    balance: wallet.currentBalance,
+    color: wallet.color ?? 'teal',
+    icon: wallet.icon ?? 'wallet',
+    transactionCount,
   };
 }
 
+async function getTransactionCounts() {
+  const { data } = await apiClient.get<PagedResult<TransactionDto>>('/transactions', {
+    params: { page: 1, pageSize: 100 },
+  });
+
+  return data.items.reduce<Record<string, number>>((acc, item) => {
+    if (item.walletId) {
+      acc[item.walletId] = (acc[item.walletId] ?? 0) + 1;
+    }
+    return acc;
+  }, {});
+}
+
 export const walletsApi = {
-  list: () =>
-    withMockTask(() => getMockDb().wallets.map((wallet) => toWalletView(wallet.id)), 180),
-  getById: (id: string) => withMockTask(() => toWalletView(id), 180),
-  save: (payload: WalletPayload, id?: string) =>
-    withMockTask(() => {
-      const next = updateMockDb((db) => {
-        if (id) {
-          return {
-            ...db,
-            wallets: db.wallets.map((wallet) => (wallet.id === id ? { ...wallet, ...payload } : wallet)),
-          };
-        }
-        return {
-          ...db,
-          wallets: [
-            ...db.wallets,
-            { id: `wallet-${Date.now()}`, ...payload },
-          ],
-        };
-      });
-      const walletId = id ?? next.wallets[next.wallets.length - 1].id;
-      return toWalletView(walletId);
-    }, 220),
+  list: async () => {
+    const [walletsResponse, counts] = await Promise.all([
+      apiClient.get<WalletDto[]>('/wallets'),
+      getTransactionCounts(),
+    ]);
+
+    return {
+      data: walletsResponse.data.map((wallet) => toWalletView(wallet, counts[wallet.id] ?? 0)),
+    };
+  },
+
+  getById: async (id: string) => {
+    const [walletResponse, counts] = await Promise.all([
+      apiClient.get<WalletDto>(`/wallets/${id}`),
+      getTransactionCounts(),
+    ]);
+
+    return {
+      data: toWalletView(walletResponse.data, counts[id] ?? 0),
+    };
+  },
+
+  save: async (payload: WalletPayload, id?: string) => {
+    const request = {
+      name: payload.name,
+      type: payload.type === 'shared-household' ? 'sharedHousehold' : payload.type,
+      currency: payload.currency,
+      currentBalance: payload.balance,
+      color: payload.color,
+      icon: payload.icon,
+      ...(id ? { isArchived: false } : {}),
+    };
+
+    if (id) {
+      await apiClient.put(`/wallets/${id}`, request);
+      return walletsApi.getById(id);
+    }
+
+    const { data } = await apiClient.post<{ id: string }>('/wallets', request);
+    return walletsApi.getById(data.id);
+  },
 };

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { groceryPricesApi } from '../api/grocery-prices.api';
-import type { GroceryPriceRecord } from '@/shared/mocks/appData';
+import type { AddPriceRequest } from '../types/grocery-prices.types';
 
 const key = ['grocery-prices'] as const;
 
@@ -15,7 +15,7 @@ export function useGroceryPrice(id?: string) {
 export function useSaveGroceryPrice() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, payload }: { id?: string; payload: Omit<GroceryPriceRecord, 'id'> }) => (await groceryPricesApi.save(payload, id)).data,
+    mutationFn: async ({ payload }: { id?: string; payload: AddPriceRequest }) => (await groceryPricesApi.save(payload)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: key }),
   });
 }

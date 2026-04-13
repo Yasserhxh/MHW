@@ -1,14 +1,29 @@
 import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { getNotificationsConnection } from '../../../shared/lib/signalr';
 import { useNotificationsStore } from './notifications.store';
 
 export function useNotificationRealtime(enabled: boolean) {
+  const queryClient = useQueryClient();
   const push = useNotificationsStore((s) => s.push);
   const setUnreadCount = useNotificationsStore((s) => s.setUnreadCount);
 
   useEffect(() => {
     if (!enabled) return;
     const conn = getNotificationsConnection();
+    const handleNotification = (payload: { id: string; title: string; body?: string; createdAt: string }) => {
+      push({
+        id: payload.id,
+        title: payload.title,
+        createdAt: payload.createdAt,
+        read: false,
+      });
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    };
+    const handleUnreadCount = (payload: { count: number }) => {
+      setUnreadCount(payload.count);
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    };
 
     const start = async () => {
       try {
@@ -18,24 +33,14 @@ export function useNotificationRealtime(enabled: boolean) {
       }
     };
 
-    conn.on('ReceiveNotification', (payload: { id: string; title: string; message?: string; createdAt: string }) => {
-      push({
-        id: payload.id,
-        title: payload.title,
-        createdAt: payload.createdAt,
-        read: false,
-      });
-    });
-
-    conn.on('UnreadCountChanged', (count: number) => {
-      setUnreadCount(count);
-    });
+    conn.on('Notification', handleNotification);
+    conn.on('UnreadCountChanged', handleUnreadCount);
 
     start();
 
     return () => {
-      conn.off('ReceiveNotification');
-      conn.off('UnreadCountChanged');
+      conn.off('Notification', handleNotification);
+      conn.off('UnreadCountChanged', handleUnreadCount);
     };
-  }, [enabled, push, setUnreadCount]);
+  }, [enabled, push, queryClient, setUnreadCount]);
 }

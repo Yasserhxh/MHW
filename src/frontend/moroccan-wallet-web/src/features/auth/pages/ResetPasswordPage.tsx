@@ -8,7 +8,7 @@ import { normalizeApiError } from '@/shared/utils/error';
 
 export default function ResetPasswordPage() {
   const [params] = useSearchParams();
-  const [token, setToken] = useState(params.get('token') ?? 'mock-reset-token');
+  const [token, setToken] = useState(params.get('token') ?? '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [success, setSuccess] = useState('');
@@ -17,7 +17,7 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="mx-auto max-w-xl py-10">
-      <AuthCard title="Reset password" subtitle="Set a new password for your mock account session.">
+      <AuthCard title="Reset password" subtitle="Set a new password for your account using the reset token from email.">
         <form
           className="space-y-4"
           onSubmit={async (event) => {

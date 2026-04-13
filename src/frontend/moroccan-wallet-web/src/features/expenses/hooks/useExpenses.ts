@@ -27,3 +27,14 @@ export function useCreateExpense() {
     },
   });
 }
+
+export function useExpense(id?: string) {
+  return useQuery({
+    queryKey: ['expenses', 'detail', id],
+    queryFn: async () => {
+      const { data } = await expensesApi.getById(id!);
+      return data;
+    },
+    enabled: Boolean(id),
+  });
+}

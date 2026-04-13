@@ -5,12 +5,13 @@ import { Drawer } from '@/shared/components/ui/Drawer';
 import { Input } from '@/shared/components/ui/Input';
 import { Button } from '@/shared/components/ui/Button';
 import { expenseFormSchema, type ExpenseFormValues } from '../schemas/expense.schema';
-import { EXPENSE_CATEGORIES, type PaymentMethodOption, type WalletOption } from '../types/expenses.types';
+import type { CategoryOption, PaymentMethodOption, WalletOption } from '../types/expenses.types';
 
 interface AddExpenseDrawerProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (values: ExpenseFormValues) => Promise<void>;
+  categories: CategoryOption[];
   wallets: WalletOption[];
   paymentMethods: PaymentMethodOption[];
   submitting?: boolean;
@@ -20,6 +21,7 @@ export function AddExpenseDrawer({
   open,
   onClose,
   onSubmit,
+  categories,
   wallets,
   paymentMethods,
   submitting = false,
@@ -33,13 +35,13 @@ export function AddExpenseDrawer({
   } = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
     defaultValues: {
-      title: '',
-      amount: 0,
-      type: 'expense',
-      category: 'groceries',
-      walletId: 'main-wallet',
-      paymentMethodId: 'card',
-      date: new Date().toISOString().slice(0, 10),
+        title: '',
+        amount: 0,
+        type: 'expense',
+        category: categories[0]?.id ?? 'uncategorized',
+        walletId: 'main-wallet',
+        paymentMethodId: 'card',
+        date: new Date().toISOString().slice(0, 10),
       notes: '',
     },
   });
@@ -50,14 +52,14 @@ export function AddExpenseDrawer({
         title: '',
         amount: 0,
         type: 'expense',
-        category: 'groceries',
+        category: categories[0]?.id ?? 'uncategorized',
         walletId: wallets[0]?.id ?? 'main-wallet',
         paymentMethodId: paymentMethods[0]?.id ?? 'card',
         date: new Date().toISOString().slice(0, 10),
         notes: '',
       });
     }
-  }, [open, paymentMethods, reset, wallets]);
+  }, [categories, open, paymentMethods, reset, wallets]);
 
   const submit = handleSubmit(async (values) => {
     await onSubmit(values);
@@ -115,8 +117,8 @@ export function AddExpenseDrawer({
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-slate-700">Category</label>
                 <select {...field} className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500">
-                  {EXPENSE_CATEGORIES.map((option) => (
-                    <option key={option.value} value={option.value}>
+                  {categories.map((option) => (
+                    <option key={option.id} value={option.id}>
                       {option.label}
                     </option>
                   ))}

@@ -1,62 +1,132 @@
-import { getMockDb, updateMockDb } from '@/shared/mocks/mockDb';
-import { withMockTask } from '@/shared/mocks/mockApi';
-import type { UserPreferences } from '@/shared/mocks/appData';
+import { apiClient } from '@/shared/api/client';
+import { useAuthStore } from '@/features/auth/store/auth.store';
+
+type ProfileResponse = {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  language: string;
+  timezone: string;
+  createdAt: string;
+};
+
+type PreferencesResponse = {
+  userId: string;
+  locale: string;
+  preferredCurrency: string;
+  timezone: string;
+  monthlyBudgetPreference?: number | null;
+  salaryDay?: number | null;
+  householdMode: string;
+};
 
 type ProfilePayload = { fullName: string; email: string; language: string; timezone: string };
-type PreferencePayload = Partial<Pick<UserPreferences, 'currency' | 'defaultWalletId' | 'salaryDay' | 'dashboardCompactMode' | 'householdDefaults'>>;
-type NotificationSettingsPayload = Partial<UserPreferences['notifications']>;
+type PreferencePayload = {
+  currency?: string;
+  defaultWalletId?: string;
+  salaryDay?: number;
+  dashboardCompactMode?: boolean;
+  householdDefaults?: string;
+};
+type NotificationSettingsPayload = {
+  reminderInApp?: boolean;
+  reminderEmail?: boolean;
+  sharedExpenseInApp?: boolean;
+  budgetWarningInApp?: boolean;
+  weeklyDigestEmail?: boolean;
+};
+
+const notificationPreferenceKey = 'mhw-notification-preferences';
+
+const defaultNotificationPreferences: Required<NotificationSettingsPayload> = {
+  reminderInApp: true,
+  reminderEmail: true,
+  sharedExpenseInApp: true,
+  budgetWarningInApp: true,
+  weeklyDigestEmail: false,
+};
+
+function readNotificationPreferences() {
+  if (typeof window === 'undefined') {
+    return defaultNotificationPreferences;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(notificationPreferenceKey);
+    if (!raw) {
+      return defaultNotificationPreferences;
+    }
+
+    return {
+      ...defaultNotificationPreferences,
+      ...JSON.parse(raw),
+    };
+  } catch {
+    return defaultNotificationPreferences;
+  }
+}
+
+function writeNotificationPreferences(payload: NotificationSettingsPayload) {
+  const next = {
+    ...readNotificationPreferences(),
+    ...payload,
+  };
+  window.localStorage.setItem(notificationPreferenceKey, JSON.stringify(next));
+  return next;
+}
 
 export const settingsApi = {
-  getProfile: () =>
-    withMockTask(() => {
-      const db = getMockDb();
-      const user = db.users.find((item) => item.id === db.currentUserId)!;
-      const onboarding = db.onboarding[db.currentUserId];
-      return {
-        fullName: user.fullName,
-        email: user.email,
-        language: onboarding.language,
-        timezone: onboarding.timezone,
-      };
-    }, 150),
-  saveProfile: (payload: ProfilePayload) =>
-    withMockTask(() => {
-      updateMockDb((db) => ({
-        ...db,
-        users: db.users.map((user) => (user.id === db.currentUserId ? { ...user, fullName: payload.fullName, email: payload.email } : user)),
-        onboarding: {
-          ...db.onboarding,
-          [db.currentUserId]: { ...db.onboarding[db.currentUserId], fullName: payload.fullName, language: payload.language, timezone: payload.timezone },
-        },
-      }));
-      return true;
-    }, 180),
-  getPreferences: () =>
-    withMockTask(() => {
-      const db = getMockDb();
-      return { ...db.preferences[db.currentUserId], ...db.onboarding[db.currentUserId] };
-    }, 150),
-  savePreferences: (payload: PreferencePayload) =>
-    withMockTask(() => {
-      updateMockDb((db) => ({
-        ...db,
-        preferences: { ...db.preferences, [db.currentUserId]: { ...db.preferences[db.currentUserId], ...payload } },
-        onboarding: { ...db.onboarding, [db.currentUserId]: { ...db.onboarding[db.currentUserId], currency: payload.currency ?? db.onboarding[db.currentUserId].currency, salaryDay: payload.salaryDay ?? db.onboarding[db.currentUserId].salaryDay } },
-      }));
-      return true;
-    }, 180),
-  saveNotificationSettings: (payload: NotificationSettingsPayload) =>
-    withMockTask(() => {
-      updateMockDb((db) => ({
-        ...db,
-        preferences: {
-          ...db.preferences,
-          [db.currentUserId]: {
-            ...db.preferences[db.currentUserId],
-            notifications: { ...db.preferences[db.currentUserId].notifications, ...payload },
-          },
-        },
-      }));
-      return true;
-    }, 180),
+  getProfile: async () => {
+    const { data } = await apiClient.get<ProfileResponse>('/users/profile');
+    const auth = useAuthStore.getState();
+    return {
+      data: {
+        fullName: data.displayName,
+        email: auth.email ?? '',
+        language: data.language,
+        timezone: data.timezone,
+      },
+    };
+  },
+
+  saveProfile: async (payload: ProfilePayload) => {
+    const { data } = await apiClient.put('/users/profile', {
+      displayName: payload.fullName,
+      avatarUrl: null,
+      language: payload.language,
+      timezone: payload.timezone,
+    });
+    return { data };
+  },
+
+  getPreferences: async () => {
+    const { data } = await apiClient.get<PreferencesResponse>('/users/preferences');
+    return {
+      data: {
+        currency: data.preferredCurrency,
+        defaultWalletId: '',
+        salaryDay: data.salaryDay ?? 28,
+        dashboardCompactMode: false,
+        householdDefaults: data.householdMode,
+        notifications: readNotificationPreferences(),
+      },
+    };
+  },
+
+  savePreferences: async (payload: PreferencePayload) => {
+    const current = await apiClient.get<PreferencesResponse>('/users/preferences');
+    const { data } = await apiClient.put('/users/preferences', {
+      locale: current.data.locale,
+      preferredCurrency: payload.currency ?? current.data.preferredCurrency,
+      timezone: current.data.timezone,
+      monthlyBudgetPreference: current.data.monthlyBudgetPreference ?? null,
+      salaryDay: payload.salaryDay ?? current.data.salaryDay ?? null,
+      householdMode: payload.householdDefaults ?? current.data.householdMode,
+    });
+    return { data };
+  },
+
+  saveNotificationSettings: async (payload: NotificationSettingsPayload) => {
+    return { data: writeNotificationPreferences(payload) };
+  },
 };

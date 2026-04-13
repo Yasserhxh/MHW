@@ -1,69 +1,90 @@
+import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
+import { getApiBaseUrl } from '@/shared/api/client';
+import { authStore } from '@/features/auth/store/auth.store';
+
 type NotificationPayload = {
   id: string;
-  kind?: string;
+  type?: string;
   title: string;
-  message?: string;
+  body?: string;
   createdAt: string;
-  actionUrl?: string;
-  isRead?: boolean;
+  data?: unknown;
+};
+
+type UnreadCountPayload = {
+  count: number;
 };
 
 type EventMap = {
-  ReceiveNotification: NotificationPayload;
-  UnreadCountChanged: number;
+  Notification: NotificationPayload;
+  UnreadCountChanged: UnreadCountPayload;
 };
 
 type ConnectionState = 'Disconnected' | 'Connected';
 
 class NotificationConnection {
-  public state: ConnectionState = 'Disconnected';
-  private listeners: { [K in keyof EventMap]?: Set<(payload: EventMap[K]) => void> } = {};
-  private timer: number | null = null;
+  private connection: HubConnection | null = null;
+
+  get state(): ConnectionState {
+    return this.connection?.state === HubConnectionState.Connected ? 'Connected' : 'Disconnected';
+  }
+
+  private ensureConnection() {
+    if (!this.connection) {
+      this.connection = new HubConnectionBuilder()
+        .withUrl(`${getApiBaseUrl()}/hubs/notifications`, {
+          accessTokenFactory: () => authStore.getState().accessToken ?? '',
+        })
+        .withAutomaticReconnect()
+        .configureLogging(LogLevel.Warning)
+        .build();
+    }
+
+    return this.connection;
+  }
 
   async start() {
-    if (this.state === 'Connected') return;
-    this.state = 'Connected';
+    const connection = this.ensureConnection();
+    if (connection.state === HubConnectionState.Connected || connection.state === HubConnectionState.Connecting) {
+      return;
+    }
 
-    this.timer = window.setInterval(() => {
-      const payload: NotificationPayload = {
-        id: `live-${Date.now()}`,
-        title: 'Live household update',
-        message: 'Mock realtime notification received.',
-        createdAt: new Date().toISOString(),
-        kind: 'system',
-      };
-      this.emit('ReceiveNotification', payload);
-    }, 45000);
+    await connection.start();
   }
 
   async stop() {
-    if (this.timer) window.clearInterval(this.timer);
-    this.timer = null;
-    this.state = 'Disconnected';
+    if (!this.connection || this.connection.state === HubConnectionState.Disconnected) {
+      return;
+    }
+
+    await this.connection.stop();
   }
 
   on<K extends keyof EventMap>(event: K, cb: (payload: EventMap[K]) => void) {
-    if (!this.listeners[event]) this.listeners[event] = new Set();
-    this.listeners[event]?.add(cb);
+    this.ensureConnection().on(event, cb);
   }
 
   off<K extends keyof EventMap>(event: K, cb?: (payload: EventMap[K]) => void) {
-    if (!cb) {
-      this.listeners[event]?.clear();
+    if (!this.connection) {
       return;
     }
-    this.listeners[event]?.delete(cb);
-  }
 
-  private emit<K extends keyof EventMap>(event: K, payload: EventMap[K]) {
-    this.listeners[event]?.forEach((cb) => cb(payload));
+    if (cb) {
+      this.connection.off(event, cb);
+      return;
+    }
+
+    this.connection.off(event);
   }
 }
 
 let connection: NotificationConnection | null = null;
 
 export function getNotificationsConnection() {
-  if (!connection) connection = new NotificationConnection();
+  if (!connection) {
+    connection = new NotificationConnection();
+  }
+
   return connection;
 }
 

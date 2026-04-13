@@ -14,7 +14,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="mx-auto max-w-xl py-10">
-      <AuthCard title="Forgot password" subtitle="We will simulate a reset email and let you continue with the mock token flow.">
+      <AuthCard title="Forgot password" subtitle="Request a reset link for your account. In development, the backend email provider may log the token instead of delivering a real email.">
         <form
           className="space-y-4"
           onSubmit={async (event) => {
@@ -24,7 +24,7 @@ export default function ForgotPasswordPage() {
             setSuccess('');
             try {
               await authApi.forgotPassword({ email });
-              setSuccess('Reset instructions sent. Use token "mock-reset-token" on the next screen.');
+              setSuccess('Reset instructions sent. Check the backend email output for the reset token if you are using the development email provider.');
             } catch (err) {
               setError(normalizeApiError(err).message);
             } finally {

@@ -21,7 +21,7 @@ export default function NotificationsPage() {
       <AppPageHeader
         title="Notifications"
         subtitle="Unread alerts, household activity, and system updates all in one place."
-        action={<div className="flex gap-2"><Button variant="outline" onClick={() => actions.emitMock.mutate()}>Simulate live event</Button><Button variant="ghost" onClick={() => actions.markAllRead.mutate()}>Mark all read</Button></div>}
+        action={<div className="flex gap-2"><Button variant="ghost" onClick={() => actions.markAllRead.mutate()}>Mark all read</Button></div>}
       />
       {sections.map(([label, items]) => (
         <section key={label} className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">

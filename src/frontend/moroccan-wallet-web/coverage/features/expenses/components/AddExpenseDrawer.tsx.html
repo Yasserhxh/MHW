@@ -32,7 +32,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/9</span>
+                <span class='fraction'>0/13</span>
             </div>
         
             
@@ -242,7 +242,11 @@
 <a name='L177'></a><a href='#L177'>177</a>
 <a name='L178'></a><a href='#L178'>178</a>
 <a name='L179'></a><a href='#L179'>179</a>
-<a name='L180'></a><a href='#L180'>180</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L180'></a><a href='#L180'>180</a>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -428,12 +432,13 @@ import { Drawer } from '@/shared/components/ui/Drawer';
 import { Input } from '@/shared/components/ui/Input';
 import { Button } from '@/shared/components/ui/Button';
 import { expenseFormSchema, type ExpenseFormValues } from '../schemas/expense.schema';
-import { EXPENSE_CATEGORIES, type PaymentMethodOption, type WalletOption } from '../types/expenses.types';
+import type { CategoryOption, PaymentMethodOption, WalletOption } from '../types/expenses.types';
 &nbsp;
 interface AddExpenseDrawerProps {
   open: boolean;
   onClose: () =&gt; void;
   onSubmit: (values: ExpenseFormValues) =&gt; Promise&lt;void&gt;;
+  categories: CategoryOption[];
   wallets: WalletOption[];
   paymentMethods: PaymentMethodOption[];
   submitting?: boolean;
@@ -443,6 +448,7 @@ export function <span class="fstat-no" title="function not covered" >AddExpenseD
   open,
   onClose,
   onSubmit,
+  categories,
   wallets,
   paymentMethods,
   submitting = <span class="branch-0 cbranch-no" title="branch not covered" >false,</span>
@@ -456,13 +462,13 @@ export function <span class="fstat-no" title="function not covered" >AddExpenseD
   } = useForm&lt;ExpenseFormValues&gt;({
     resolver: zodResolver(expenseFormSchema),
     defaultValues: {
-      title: '',
-      amount: 0,
-      type: 'expense',
-      category: 'groceries',
-      walletId: 'main-wallet',
-      paymentMethodId: 'card',
-      date: new Date().toISOString().slice(0, 10),
+        title: '',
+        amount: 0,
+        type: 'expense',
+        category: categories[0]?.id ?? 'uncategorized',
+        walletId: 'main-wallet',
+        paymentMethodId: 'card',
+        date: new Date().toISOString().slice(0, 10),
       notes: '',
     },
   });
@@ -473,14 +479,14 @@ export function <span class="fstat-no" title="function not covered" >AddExpenseD
         title: '',
         amount: 0,
         type: 'expense',
-        category: 'groceries',
+        category: categories[0]?.id ?? 'uncategorized',
         walletId: wallets[0]?.id ?? 'main-wallet',
         paymentMethodId: paymentMethods[0]?.id ?? 'card',
         date: new Date().toISOString().slice(0, 10),
         notes: '',
       });
     }
-  }, [open, paymentMethods, reset, wallets]);
+  }, [categories, open, paymentMethods, reset, wallets]);
 &nbsp;
   const submit = <span class="cstat-no" title="statement not covered" >handleSubmit(<span class="fstat-no" title="function not covered" >async (v</span>alues) =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    await onSubmit(values);</span>
@@ -538,8 +544,8 @@ export function <span class="fstat-no" title="function not covered" >AddExpenseD
 <span class="cstat-no" title="statement not covered" >              &lt;div className="space-y-1.5"&gt;</span>
                 &lt;label className="block text-sm font-medium text-slate-700"&gt;Category&lt;/label&gt;
                 &lt;select {...field} className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"&gt;
-                  {EXPENSE_CATEGORIES.<span class="fstat-no" title="function not covered" >map((o</span>ption) =&gt; (
-<span class="cstat-no" title="statement not covered" >                    &lt;option key={option.value} value={option.value}&gt;</span>
+                  {categories.<span class="fstat-no" title="function not covered" >map((o</span>ption) =&gt; (
+<span class="cstat-no" title="statement not covered" >                    &lt;option key={option.id} value={option.id}&gt;</span>
                       {option.label}
                     &lt;/option&gt;
                   ))}
@@ -607,7 +613,7 @@ export function <span class="fstat-no" title="function not covered" >AddExpenseD
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-04-12T18:18:38.328Z
+                at 2026-04-13T00:46:24.100Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

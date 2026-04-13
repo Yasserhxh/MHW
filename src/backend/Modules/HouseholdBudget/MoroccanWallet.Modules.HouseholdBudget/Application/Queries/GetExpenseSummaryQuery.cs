@@ -28,12 +28,12 @@ public sealed class GetExpenseSummaryQueryHandler(HouseholdBudgetDbContext db)
         GetExpenseSummaryQuery request,
         CancellationToken cancellationToken)
     {
-        var startDate = new DateTime(request.Year, request.Month, 1);
-        var endDate = startDate.AddMonths(1).AddDays(-1);
+        var startDate = new DateTime(request.Year, request.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var endDateExclusive = startDate.AddMonths(1);
 
         var expenses = await db.Expenses
             .AsNoTracking()
-            .Where(e => e.UserId == request.UserId && e.Date >= startDate && e.Date <= endDate)
+            .Where(e => e.UserId == request.UserId && e.Date >= startDate && e.Date < endDateExclusive)
             .GroupBy(e => e.CategoryId)
             .Select(g => new { CategoryId = g.Key, Total = g.Sum(e => e.Amount), Count = g.Count() })
             .ToListAsync(cancellationToken);

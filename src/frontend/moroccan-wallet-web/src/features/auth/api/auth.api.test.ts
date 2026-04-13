@@ -1,21 +1,89 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { post, get } = vi.hoisted(() => ({
+  post: vi.fn(),
+  get: vi.fn(),
+}));
+
+vi.mock('@/shared/api/client', () => ({
+  apiClient: {
+    post,
+    get,
+  },
+}));
+
 import { authApi } from './auth.api';
-import { getMockDb } from '@/shared/mocks/mockDb';
 
 describe('authApi', () => {
-  it('logs in an existing seeded user', async () => {
+  beforeEach(() => {
+    post.mockReset();
+    get.mockReset();
+  });
+
+  it('maps backend login and profile data into the frontend session shape', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        accessTokenExpiresAt: '2026-04-13T00:00:00Z',
+        userId: 'user-1',
+        email: 'amina@example.com',
+      },
+    });
+    get.mockResolvedValueOnce({
+      data: {
+        userId: 'user-1',
+        displayName: 'Amina Bennani',
+        language: 'fr-MA',
+        timezone: 'Africa/Casablanca',
+        createdAt: '2026-04-10T00:00:00Z',
+      },
+    });
+
     const response = await authApi.login({
       email: 'amina@example.com',
       password: 'Password123!',
     });
 
-    expect(response.data.email).toBe('amina@example.com');
-    expect(response.data.emailVerified).toBe(true);
-    expect(response.data.onboardingCompleted).toBe(true);
-    expect(response.data.accessToken).toContain('mock-access-user-1');
+    expect(response.data).toMatchObject({
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      userId: 'user-1',
+      email: 'amina@example.com',
+      fullName: 'Amina Bennani',
+      onboardingCompleted: true,
+      emailVerified: true,
+    });
+    expect(post).toHaveBeenCalledWith('/auth/login', {
+      email: 'amina@example.com',
+      password: 'Password123!',
+    });
+    expect(get).toHaveBeenCalledWith('/users/profile');
   });
 
-  it('registers a new user and seeds onboarding defaults', async () => {
+  it('falls back to the email when the profile endpoint is unavailable', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        accessTokenExpiresAt: '2026-04-13T00:00:00Z',
+        userId: 'user-1',
+        email: 'amina@example.com',
+      },
+    });
+    get.mockRejectedValueOnce(new Error('profile not ready'));
+
+    const response = await authApi.login({
+      email: 'amina@example.com',
+      password: 'Password123!',
+    });
+
+    expect(response.data.fullName).toBe('amina@example.com');
+  });
+
+  it('submits only the backend register contract after frontend validation', async () => {
+    post.mockResolvedValueOnce({ data: { userId: 'user-2', email: 'sara@example.com' } });
+
     await authApi.register({
       fullName: 'Sara Bennani',
       email: 'sara@example.com',
@@ -24,43 +92,9 @@ describe('authApi', () => {
       acceptTerms: true,
     });
 
-    const db = getMockDb();
-    const createdUser = db.users.find((user) => user.email === 'sara@example.com');
-
-    expect(createdUser).toBeDefined();
-    expect(createdUser?.emailVerified).toBe(false);
-    expect(db.currentUserId).toBe(createdUser?.id);
-    expect(db.onboarding[createdUser!.id]).toMatchObject({
-      completed: false,
-      currency: 'MAD',
-      timezone: 'Africa/Casablanca',
-      householdMode: 'just-me',
-    });
-  });
-
-  it('verifies the current user email when a token is provided', async () => {
-    await authApi.register({
-      fullName: 'New User',
-      email: 'new.user@example.com',
+    expect(post).toHaveBeenCalledWith('/auth/register', {
+      email: 'sara@example.com',
       password: 'Password123!',
-      confirmPassword: 'Password123!',
-      acceptTerms: true,
     });
-
-    await authApi.verifyEmail({ token: 'mock-token' });
-
-    const db = getMockDb();
-    const currentUser = db.users.find((user) => user.id === db.currentUserId);
-
-    expect(currentUser?.emailVerified).toBe(true);
-  });
-
-  it('rejects login with invalid credentials', async () => {
-    await expect(
-      authApi.login({
-        email: 'amina@example.com',
-        password: 'wrong-password',
-      })
-    ).rejects.toThrow('Invalid email or password.');
   });
 });
