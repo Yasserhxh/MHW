@@ -47,6 +47,7 @@ export interface ExpenseCategoryBreakdown {
 export interface CategoryOption {
   id: ExpenseCategory;
   label: string;
+  type?: TransactionType;
 }
 
 export interface WalletOption {
@@ -62,6 +63,7 @@ export interface PaymentMethodOption {
 export interface ExpenseFilters {
   search?: string;
   dateRange?: 'this-month' | 'last-30-days' | 'last-90-days';
+  type?: TransactionType | 'all';
   category?: ExpenseCategory | 'all';
   walletId?: WalletId | 'all';
   paymentMethodId?: PaymentMethodId | 'all';
@@ -85,4 +87,8 @@ export interface CreateExpenseRequest {
   paymentMethodId: PaymentMethodId;
   date: string;
   notes?: string;
+}
+
+export interface UpdateExpenseRequest extends CreateExpenseRequest {
+  id: string;
 }

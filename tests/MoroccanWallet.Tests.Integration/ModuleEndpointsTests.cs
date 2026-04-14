@@ -214,6 +214,11 @@ public sealed class ModuleEndpointsTests
         });
         settlement.StatusCode.Should().Be(HttpStatusCode.Created);
 
+        var settlementsHistory = await client.GetAsync($"/api/v1/shared-expenses/groups/{group.Id}/settlements");
+        settlementsHistory.StatusCode.Should().Be(HttpStatusCode.OK);
+        var settlementsJson = await settlementsHistory.Content.ReadAsStringAsync();
+        settlementsJson.Should().Contain("Manual correction");
+
         var createProduct = await client.PostAsJsonAsync("/api/v1/grocery-prices/products", new
         {
             name = "Milk",

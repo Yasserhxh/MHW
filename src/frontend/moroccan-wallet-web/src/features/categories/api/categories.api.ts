@@ -1,12 +1,6 @@
 import { apiClient } from '@/shared/api/client';
 import type { PagedResult } from '@/shared/types/api';
-
-export interface CategoryPayload {
-  name: string;
-  type: 'expense' | 'income';
-  color: string;
-  icon: string;
-}
+import type { CategoryPayload, CategoryView } from '../types/categories.types';
 
 type CategoryDto = {
   id: string;
@@ -45,7 +39,7 @@ export const categoriesApi = {
           isDefault: category.isDefault,
           usageCount: linkedTransactions.length,
           totalAmount: linkedTransactions.reduce((sum, tx) => sum + tx.amount, 0),
-        };
+        } satisfies CategoryView;
       }),
     };
   },
@@ -63,5 +57,9 @@ export const categoriesApi = {
     }
 
     return apiClient.post('/categories', request);
+  },
+
+  remove: async (id: string) => {
+    await apiClient.delete(`/categories/${id}`);
   },
 };

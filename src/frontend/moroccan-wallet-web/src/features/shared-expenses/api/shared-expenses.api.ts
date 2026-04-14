@@ -1,7 +1,17 @@
+import { useAuthStore } from '@/features/auth/store/auth.store';
 import { apiClient } from '@/shared/api/client';
 import type { PagedResult } from '@/shared/types/api';
-import { useAuthStore } from '@/features/auth/store/auth.store';
-import type { CreateSharedExpenseRequest, SharedExpense, SharedExpensesOverview } from '../types/shared-expenses.types';
+import type {
+  CreateSettlementRequest,
+  CreateSharedExpenseRequest,
+  CreateSharedGroupRequest,
+  Settlement,
+  SharedExpense,
+  SharedGroupMember,
+  SharedGroupOverview,
+  SharedGroupSummary,
+  SharedMemberBalance,
+} from '../types/shared-expenses.types';
 
 type GroupSummaryDto = {
   id: string;
@@ -13,7 +23,7 @@ type GroupSummaryDto = {
   createdAt: string;
 };
 
-type GroupDetailResponse = {
+type GroupDetailDto = {
   id: string;
   name: string;
   description?: string | null;
@@ -23,11 +33,23 @@ type GroupDetailResponse = {
   members: Array<{ userId: string; joinedAt: string }>;
 };
 
-type GroupBalancesResponse = {
+type GroupBalancesDto = {
   groupId: string;
   groupName: string;
   currency: string;
   balances: Array<{ userId: string; paid: number; owes: number; balance: number }>;
+};
+
+type SettlementDto = {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  recordedByUserId: string;
+  amount: number;
+  currency: string;
+  settledOn: string;
+  notes?: string | null;
+  createdAt: string;
 };
 
 type SharedExpenseDto = {
@@ -42,106 +64,235 @@ type SharedExpenseDto = {
   createdAt: string;
 };
 
-type SharedExpenseDetailResponse = SharedExpenseDto & {
+type SharedExpenseDetailDto = SharedExpenseDto & {
   groupId: string;
 };
 
-function formatMemberName(userId: string, currentUserId?: string | null) {
+type CreatedGroupResponse = {
+  id: string;
+  name: string;
+};
+
+type CreatedSettlementResponse = {
+  id: string;
+};
+
+const descriptionSeparator = '\n\n';
+
+function toRole(userId: string, ownerId: string): 'Owner' | 'Member' {
+  return userId === ownerId ? 'Owner' : 'Member';
+}
+
+function formatMemberName(userId: string, ownerId: string, currentUserId?: string | null) {
   if (userId === currentUserId) {
     return 'You';
   }
 
-  return `Member ${userId.slice(0, 8)}`;
+  const prefix = userId === ownerId ? 'Owner' : 'Member';
+  return `${prefix} ${userId.slice(0, 8)}`;
 }
 
-function toSharedExpense(item: SharedExpenseDto): SharedExpense {
+function deserializeDescription(description: string) {
+  const [title, ...rest] = description.split(descriptionSeparator);
   return {
-    id: item.id,
-    title: item.description,
-    amount: item.amount,
-    currency: item.currency,
-    paidByMemberId: item.paidById,
-    date: item.date.slice(0, 10),
-    participantIds: item.splits.map((split) => split.userId),
-    splitType: item.splitType.toLowerCase() === 'equal' ? 'equal' : 'custom',
-    settled: item.splits.every((split) => split.isSettled),
-    createdAt: item.createdAt,
+    title: title.trim(),
+    notes: rest.join(descriptionSeparator).trim() || undefined,
   };
 }
 
-async function resolvePrimaryGroup() {
-  const { data } = await apiClient.get<GroupSummaryDto[]>('/shared-expenses/groups');
-  return data[0] ?? null;
+function serializeDescription(title: string, notes?: string) {
+  const trimmedTitle = title.trim();
+  const trimmedNotes = notes?.trim();
+
+  if (!trimmedNotes) {
+    return trimmedTitle;
+  }
+
+  return `${trimmedTitle}${descriptionSeparator}${trimmedNotes}`;
+}
+
+function mapGroupSummary(group: GroupSummaryDto): SharedGroupSummary {
+  return {
+    id: group.id,
+    name: group.name,
+    description: group.description ?? undefined,
+    ownerId: group.ownerId,
+    currency: group.currency,
+    memberCount: group.memberCount,
+    createdAt: group.createdAt,
+  };
+}
+
+function mapMembers(group: GroupDetailDto, currentUserId?: string | null): SharedGroupMember[] {
+  return group.members.map((member) => ({
+    userId: member.userId,
+    joinedAt: member.joinedAt,
+    name: formatMemberName(member.userId, group.ownerId, currentUserId),
+    role: toRole(member.userId, group.ownerId),
+  }));
+}
+
+function mapExpense(
+  expense: SharedExpenseDto | SharedExpenseDetailDto,
+  members: SharedGroupMember[],
+  groupId: string
+): SharedExpense {
+  const description = deserializeDescription(expense.description);
+  const membersById = new Map(members.map((member) => [member.userId, member]));
+
+  return {
+    id: expense.id,
+    groupId,
+    title: description.title,
+    amount: expense.amount,
+    currency: expense.currency,
+    paidByUserId: expense.paidById,
+    paidByName: membersById.get(expense.paidById)?.name ?? expense.paidById,
+    date: expense.date.slice(0, 10),
+    participantIds: expense.splits.map((split) => split.userId),
+    splitType: expense.splitType.toLowerCase() === 'equal' ? 'equal' : 'custom',
+    splits: expense.splits.map((split) => ({
+      userId: split.userId,
+      name: membersById.get(split.userId)?.name ?? split.userId,
+      amount: split.amount,
+      isSettled: split.isSettled,
+    })),
+    settled: expense.splits.every((split) => split.isSettled),
+    createdAt: expense.createdAt,
+    notes: description.notes,
+  };
+}
+
+function mapSettlement(settlement: SettlementDto, members: SharedGroupMember[]): Settlement {
+  const membersById = new Map(members.map((member) => [member.userId, member]));
+
+  return {
+    id: settlement.id,
+    fromUserId: settlement.fromUserId,
+    fromName: membersById.get(settlement.fromUserId)?.name ?? settlement.fromUserId,
+    toUserId: settlement.toUserId,
+    toName: membersById.get(settlement.toUserId)?.name ?? settlement.toUserId,
+    amount: settlement.amount,
+    currency: settlement.currency,
+    settledAt: settlement.settledOn,
+    notes: settlement.notes ?? undefined,
+  };
+}
+
+function buildEqualSplits(participantIds: string[], amount: number) {
+  if (!participantIds.length) {
+    throw new Error('Select at least one participant before saving the shared expense.');
+  }
+
+  const normalizedAmount = Number(amount.toFixed(2));
+  const baseShare = Number((normalizedAmount / participantIds.length).toFixed(2));
+
+  return participantIds.map((userId, index) => ({
+    userId,
+    amount:
+      index === participantIds.length - 1
+        ? Number((normalizedAmount - baseShare * index).toFixed(2))
+        : baseShare,
+  }));
+}
+
+async function fetchGroupMembers(groupId: string) {
+  const currentUserId = useAuthStore.getState().userId;
+  const { data } = await apiClient.get<GroupDetailDto>(`/shared-expenses/groups/${groupId}`);
+  const members = mapMembers(data, currentUserId);
+
+  return members;
 }
 
 export const sharedExpensesApi = {
-  getOverview: async () => {
-    const group = await resolvePrimaryGroup();
-    const currentUserId = useAuthStore.getState().userId;
+  listGroups: async () => {
+    const { data } = await apiClient.get<GroupSummaryDto[]>('/shared-expenses/groups');
+    return {
+      data: data.map(mapGroupSummary),
+    };
+  },
 
-    if (!group) {
-      return {
-        data: {
-          groupId: null,
-          members: [],
-          settlements: [],
-          sharedExpenses: [],
-        } satisfies SharedExpensesOverview,
-      };
-    }
+  getGroupOverview: async (groupId: string) => {
+    const { currentUserId } = {
+      currentUserId: useAuthStore.getState().userId,
+    };
 
-    const [groupDetailResponse, balancesResponse, expensesResponse] = await Promise.all([
-      apiClient.get<GroupDetailResponse>(`/shared-expenses/groups/${group.id}`),
-      apiClient.get<GroupBalancesResponse>(`/shared-expenses/groups/${group.id}/balances`),
+    const [groupResponse, balancesResponse, expensesResponse, settlementsResponse] = await Promise.all([
+      apiClient.get<GroupDetailDto>(`/shared-expenses/groups/${groupId}`),
+      apiClient.get<GroupBalancesDto>(`/shared-expenses/groups/${groupId}/balances`),
       apiClient.get<PagedResult<SharedExpenseDto>>('/shared-expenses', {
-        params: { groupId: group.id, page: 1, pageSize: 50 },
+        params: { groupId, page: 1, pageSize: 50 },
       }),
+      apiClient.get<SettlementDto[]>(`/shared-expenses/groups/${groupId}/settlements`),
     ]);
 
-    const balancesMap = new Map(balancesResponse.data.balances.map((item) => [item.userId, item.balance]));
+    const group = groupResponse.data;
+    const members = mapMembers(group, currentUserId);
+    const membersById = new Map(members.map((member) => [member.userId, member]));
+
+    const balances: SharedMemberBalance[] = balancesResponse.data.balances.map((item) => ({
+      userId: item.userId,
+      name: membersById.get(item.userId)?.name ?? item.userId,
+      role: membersById.get(item.userId)?.role ?? 'Member',
+      paid: item.paid,
+      owes: item.owes,
+      balance: item.balance,
+    }));
 
     return {
       data: {
-        groupId: group.id,
-        members: groupDetailResponse.data.members.map((member) => ({
-          id: member.userId,
-          userId: member.userId,
-          name: formatMemberName(member.userId, currentUserId),
-          email: '',
-          balance: balancesMap.get(member.userId) ?? 0,
-          role: member.userId === group.ownerId ? 'Owner' : 'Member',
-        })),
-        settlements: [],
-        sharedExpenses: expensesResponse.data.items.map(toSharedExpense),
-      } satisfies SharedExpensesOverview,
+        id: group.id,
+        name: group.name,
+        description: group.description ?? undefined,
+        ownerId: group.ownerId,
+        currency: group.currency,
+        isActive: group.isActive,
+        members,
+        balances,
+        sharedExpenses: expensesResponse.data.items.map((expense) => mapExpense(expense, members, group.id)),
+        settlements: settlementsResponse.data.map((settlement) => mapSettlement(settlement, members)),
+        settlementHistoryAvailable: true,
+      } satisfies SharedGroupOverview,
     };
   },
 
   getDetail: async (id: string) => {
-    const { data } = await apiClient.get<SharedExpenseDetailResponse>(`/shared-expenses/${id}`);
-    return { data: toSharedExpense(data) };
+    const { data } = await apiClient.get<SharedExpenseDetailDto>(`/shared-expenses/${id}`);
+    const members = await fetchGroupMembers(data.groupId);
+
+    return {
+      data: mapExpense(data, members, data.groupId),
+    };
+  },
+
+  createGroup: async (payload: CreateSharedGroupRequest) => {
+    const { data } = await apiClient.post<CreatedGroupResponse>('/shared-expenses/groups', {
+      name: payload.name,
+      description: payload.description?.trim() || null,
+      currency: payload.currency,
+    });
+
+    return { data };
   },
 
   addExpense: async (payload: CreateSharedExpenseRequest) => {
-    const group = await resolvePrimaryGroup();
-    if (!group) {
-      throw new Error('Create a shared group before adding expenses.');
-    }
-
-    const participantIds = payload.participantIds.length ? payload.participantIds : [payload.paidByUserId];
-    const share = Number((payload.amount / participantIds.length).toFixed(2));
+    const participantIds = payload.participantIds.length
+      ? payload.participantIds
+      : [useAuthStore.getState().userId].filter(Boolean) as string[];
 
     return apiClient.post('/shared-expenses', {
-      groupId: group.id,
+      groupId: payload.groupId,
       amount: payload.amount,
-      currency: payload.currency ?? group.currency,
-      description: payload.notes ? `${payload.title} - ${payload.notes}` : payload.title,
+      currency: payload.currency,
+      description: serializeDescription(payload.title, payload.notes),
       date: payload.date,
-      splitType: payload.splitType === 'equal' ? 'equal' : 'custom',
-      splits: participantIds.map((userId, index) => ({
-        userId,
-        amount: index === participantIds.length - 1 ? Number((payload.amount - share * index).toFixed(2)) : share,
-      })),
+      splitType: 'equal',
+      splits: buildEqualSplits(participantIds, payload.amount),
     });
+  },
+
+  createSettlement: async (payload: CreateSettlementRequest) => {
+    const { data } = await apiClient.post<CreatedSettlementResponse>('/shared-expenses/settlements', payload);
+    return { data };
   },
 };

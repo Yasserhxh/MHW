@@ -1,10 +1,17 @@
+import { Link } from 'react-router-dom';
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { CurrencyAmount } from './CurrencyAmount';
 import { StatusBadge } from './StatusBadge';
 import { cn } from '@/shared/utils/cn';
 import type { ExpenseTransactionListItem } from '@/features/expenses/types/expenses.types';
 
-export function TransactionList({ items, compact = false }: { items: ExpenseTransactionListItem[]; compact?: boolean }) {
+interface TransactionListProps {
+  items: ExpenseTransactionListItem[];
+  compact?: boolean;
+  getDetailHref?: (item: ExpenseTransactionListItem) => string;
+}
+
+export function TransactionList({ items, compact = false, getDetailHref }: TransactionListProps) {
   return (
     <div className={cn('space-y-3', compact && 'space-y-2')}>
       {items.map((item) => (
@@ -22,7 +29,13 @@ export function TransactionList({ items, compact = false }: { items: ExpenseTran
               {item.type === 'income' ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
             </div>
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-slate-900">{item.title}</div>
+              {getDetailHref ? (
+                <Link to={getDetailHref(item)} className="truncate text-sm font-semibold text-slate-900 hover:text-teal-700">
+                  {item.title}
+                </Link>
+              ) : (
+                <div className="truncate text-sm font-semibold text-slate-900">{item.title}</div>
+              )}
               <div className="mt-1 text-sm text-slate-500">
                 {item.categoryLabel} · {item.walletLabel} · {item.dateLabel}
               </div>
@@ -33,6 +46,7 @@ export function TransactionList({ items, compact = false }: { items: ExpenseTran
           <div className="text-right">
             <CurrencyAmount
               amount={item.amount}
+              currency={item.currency}
               positive={item.type === 'income'}
               negative={item.type === 'expense'}
               className="text-sm font-semibold"

@@ -1,6 +1,12 @@
 import { apiClient } from '@/shared/api/client';
 import type { PagedResult } from '@/shared/types/api';
-import type { AddPriceRequest, GroceryPriceListItem } from '../types/grocery-prices.types';
+import type {
+  AddPriceRequest,
+  GroceryFilters,
+  GroceryPriceHistoryEntry,
+  GroceryProductDetail,
+  GroceryProductListItem,
+} from '../types/grocery-prices.types';
 
 type ProductDto = {
   id: string;
@@ -37,65 +43,105 @@ type PriceHistoryResponse = {
   }>;
 };
 
-async function fetchProducts() {
-  const { data } = await apiClient.get<PagedResult<ProductDto>>('/grocery-prices/products', {
-    params: { page: 1, pageSize: 100 },
-  });
-  return data.items;
-}
+type CreateProductResponse = {
+  id: string;
+  name: string;
+};
 
-function toListItem(entry: PriceEntryDto, product?: ProductDto | null): GroceryPriceListItem {
+function mapHistoryEntry(entry: PriceHistoryResponse['entries'][number]): GroceryPriceHistoryEntry {
   return {
     id: entry.id,
-    productId: entry.productId,
-    productName: entry.productName,
     price: entry.price,
     currency: entry.currency,
-    storeName: entry.storeName ?? 'Unknown store',
+    storeName: entry.storeName ?? undefined,
     recordedAt: entry.observedAt,
-    unit: product?.unit ?? 'unit',
-    date: entry.observedAt.slice(0, 10),
-    isFavorite: product?.isFavorite ?? false,
-    notes: entry.storeLocation ?? undefined,
   };
 }
 
-export const groceryPricesApi = {
-  list: async () => {
-    const [entriesResponse, products] = await Promise.all([
-      apiClient.get<PagedResult<PriceEntryDto>>('/grocery-prices/entries', {
-        params: { page: 1, pageSize: 100 },
-      }),
-      fetchProducts(),
-    ]);
+function buildListItem(product: ProductDto, entries: PriceEntryDto[]): GroceryProductListItem {
+  const sortedEntries = [...entries].sort((left, right) => right.observedAt.localeCompare(left.observedAt));
+  const latestEntry = sortedEntries[0];
+  const cheapestRecentPrice = sortedEntries.length ? Math.min(...sortedEntries.map((entry) => entry.price)) : null;
 
-    const productsMap = new Map(products.map((product) => [product.id, product]));
+  return {
+    id: product.id,
+    name: product.name,
+    category: product.category ?? undefined,
+    unit: product.unit ?? undefined,
+    isFavorite: product.isFavorite,
+    latestPrice: latestEntry?.price ?? product.latestPrice ?? null,
+    latestCurrency: latestEntry?.currency ?? product.latestCurrency ?? null,
+    cheapestRecentPrice,
+    lastUpdated: latestEntry?.observedAt ?? null,
+    latestStoreName: latestEntry?.storeName ?? undefined,
+  };
+}
+
+async function fetchProducts(filters: GroceryFilters = {}) {
+  const { data } = await apiClient.get<PagedResult<ProductDto>>('/grocery-prices/products', {
+    params: {
+      search: filters.search || undefined,
+      category: filters.category || undefined,
+      favoritesOnly: filters.favoritesOnly || false,
+      page: 1,
+      pageSize: 100,
+    },
+  });
+
+  return data.items;
+}
+
+async function fetchEntries(productId?: string) {
+  const { data } = await apiClient.get<PagedResult<PriceEntryDto>>('/grocery-prices/entries', {
+    params: {
+      productId: productId || undefined,
+      page: 1,
+      pageSize: 100,
+    },
+  });
+
+  return data.items;
+}
+
+export const groceryPricesApi = {
+  list: async (filters: GroceryFilters = {}) => {
+    const [products, entries] = await Promise.all([fetchProducts(filters), fetchEntries()]);
+    const entriesByProductId = new Map<string, PriceEntryDto[]>();
+
+    for (const entry of entries) {
+      const group = entriesByProductId.get(entry.productId) ?? [];
+      group.push(entry);
+      entriesByProductId.set(entry.productId, group);
+    }
 
     return {
-      data: entriesResponse.data.items.map((entry) => toListItem(entry, productsMap.get(entry.productId))),
+      data: products.map((product) => buildListItem(product, entriesByProductId.get(product.id) ?? [])),
     };
   },
 
-  getById: async (id: string) => {
-    const [entriesResponse, products] = await Promise.all([
-      apiClient.get<PagedResult<PriceEntryDto>>('/grocery-prices/entries', {
-        params: { page: 1, pageSize: 100 },
-      }),
-      fetchProducts(),
-    ]);
+  getById: async (productId: string) => {
+    const historyResponse = await apiClient.get<PriceHistoryResponse>(`/grocery-prices/products/${productId}/history`);
+    const history = historyResponse.data.entries.map(mapHistoryEntry);
+    const productSearchResponse = await apiClient.get<PagedResult<ProductDto>>('/grocery-prices/products', {
+      params: { search: historyResponse.data.productName, page: 1, pageSize: 100 },
+    });
 
-    const entry = entriesResponse.data.items.find((item) => item.id === id);
-    if (!entry) {
-      throw new Error('Price entry not found');
-    }
-
-    await apiClient.get<PriceHistoryResponse>(`/grocery-prices/products/${entry.productId}/history`);
+    const product = productSearchResponse.data.items.find((item) => item.id === productId);
+    const latestEntry = history[0];
 
     return {
-      data: toListItem(
-        entry,
-        products.find((item) => item.id === entry.productId)
-      ),
+      data: {
+        id: productId,
+        name: historyResponse.data.productName,
+        category: product?.category ?? undefined,
+        unit: product?.unit ?? undefined,
+        isFavorite: product?.isFavorite ?? false,
+        latestPrice: latestEntry?.price ?? product?.latestPrice ?? null,
+        latestCurrency: latestEntry?.currency ?? product?.latestCurrency ?? null,
+        cheapestRecentPrice: history.length ? Math.min(...history.map((entry) => entry.price)) : null,
+        lastUpdated: latestEntry?.recordedAt ?? null,
+        history,
+      } satisfies GroceryProductDetail,
     };
   },
 
@@ -103,10 +149,10 @@ export const groceryPricesApi = {
     let productId = payload.productId;
 
     if (!productId) {
-      const { data } = await apiClient.post<{ id: string; name: string }>('/grocery-prices/products', {
+      const { data } = await apiClient.post<CreateProductResponse>('/grocery-prices/products', {
         name: payload.productName,
-        category: payload.productCategory ?? null,
-        unit: payload.productUnit ?? null,
+        category: payload.productCategory?.trim() || null,
+        unit: payload.productUnit?.trim() || null,
         barcode: null,
       });
       productId = data.id;
@@ -116,9 +162,17 @@ export const groceryPricesApi = {
       productId,
       price: payload.price,
       currency: payload.currency,
-      storeName: payload.storeName,
-      storeLocation: payload.notes ?? null,
+      storeName: payload.storeName?.trim() || null,
+      storeLocation: payload.notes?.trim() || null,
       observedAt: payload.date ?? new Date().toISOString(),
     });
+  },
+
+  toggleFavorite: async (productId: string, isFavorite: boolean) => {
+    if (isFavorite) {
+      return apiClient.delete(`/grocery-prices/favorites/${productId}`);
+    }
+
+    return apiClient.post(`/grocery-prices/favorites/${productId}`);
   },
 };

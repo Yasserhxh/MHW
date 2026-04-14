@@ -1,4 +1,5 @@
 import { apiClient } from '@/shared/api/client';
+import { isOnboardingCompletedForSession } from '@/features/onboarding/api/onboarding.session';
 import type {
   ForgotPasswordRequest,
   LoginRequest,
@@ -35,7 +36,7 @@ function buildFrontendAuthResponse(
     userId: auth.userId,
     email: auth.email,
     fullName: profile?.displayName?.trim() || auth.email,
-    onboardingCompleted: true,
+    onboardingCompleted: isOnboardingCompletedForSession({ userId: auth.userId, email: auth.email }),
     emailVerified: true,
   };
 }

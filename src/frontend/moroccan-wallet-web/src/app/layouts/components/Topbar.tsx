@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { authApi } from '@/features/auth/api/auth.api';
 import { NotificationBell } from '@/shared/components/NotificationBell';
-import { useNotifications } from '@/features/notifications/hooks/useNotifications';
+import { useUnreadNotificationCount } from '@/features/notifications/hooks/useNotifications';
 
 interface TopbarProps {
   onMenuClick: () => void;
@@ -33,8 +33,8 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   const { email, accessToken, refreshToken, clearAuth, fullName } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
-  const notifications = useNotifications();
-  const unreadCount = notifications.data?.filter((item) => !item.isRead).length ?? 0;
+  const unreadCountQuery = useUnreadNotificationCount();
+  const unreadCount = unreadCountQuery.data ?? 0;
   const initials = email?.slice(0, 2).toUpperCase() ?? 'U';
   const currentPage = useMemo(
     () => pageMeta.find((item) => item.match.test(location.pathname)) ?? pageMeta[0],

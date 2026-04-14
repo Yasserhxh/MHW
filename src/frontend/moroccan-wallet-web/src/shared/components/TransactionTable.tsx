@@ -1,9 +1,17 @@
+import { Link } from 'react-router-dom';
 import { MoreHorizontal, PencilLine, Trash2 } from 'lucide-react';
 import { CurrencyAmount } from './CurrencyAmount';
 import { StatusBadge } from './StatusBadge';
 import type { ExpenseTransactionListItem } from '@/features/expenses/types/expenses.types';
 
-export function TransactionTable({ items }: { items: ExpenseTransactionListItem[] }) {
+interface TransactionTableProps {
+  items: ExpenseTransactionListItem[];
+  getDetailHref?: (item: ExpenseTransactionListItem) => string;
+  onEdit?: (item: ExpenseTransactionListItem) => void;
+  onDelete?: (item: ExpenseTransactionListItem) => void;
+}
+
+export function TransactionTable({ items, getDetailHref, onEdit, onDelete }: TransactionTableProps) {
   return (
     <div className="hidden overflow-hidden rounded-[1.5rem] border border-slate-200 lg:block">
       <table className="min-w-full divide-y divide-slate-200">
@@ -24,7 +32,13 @@ export function TransactionTable({ items }: { items: ExpenseTransactionListItem[
             <tr key={item.id} className="align-top">
               <td className="px-4 py-4 text-sm text-slate-500">{item.dateLabel}</td>
               <td className="px-4 py-4">
-                <div className="text-sm font-semibold text-slate-900">{item.title}</div>
+                {getDetailHref ? (
+                  <Link to={getDetailHref(item)} className="text-sm font-semibold text-slate-900 hover:text-teal-700">
+                    {item.title}
+                  </Link>
+                ) : (
+                  <div className="text-sm font-semibold text-slate-900">{item.title}</div>
+                )}
                 {item.notes ? <div className="mt-1 max-w-xs text-sm text-slate-500">{item.notes}</div> : null}
               </td>
               <td className="px-4 py-4 text-sm text-slate-600">{item.categoryLabel}</td>
@@ -43,13 +57,25 @@ export function TransactionTable({ items }: { items: ExpenseTransactionListItem[
               </td>
               <td className="px-4 py-4">
                 <div className="flex justify-end gap-2 text-slate-400">
-                  <button className="rounded-xl border border-slate-200 p-2 hover:bg-slate-50" aria-label="Edit transaction">
+                  <button
+                    className="rounded-xl border border-slate-200 p-2 hover:bg-slate-50"
+                    aria-label="Edit transaction"
+                    type="button"
+                    onClick={() => onEdit?.(item)}
+                    disabled={!onEdit}
+                  >
                     <PencilLine className="h-4 w-4" />
                   </button>
-                  <button className="rounded-xl border border-slate-200 p-2 hover:bg-slate-50" aria-label="Delete transaction">
+                  <button
+                    className="rounded-xl border border-slate-200 p-2 hover:bg-slate-50"
+                    aria-label="Delete transaction"
+                    type="button"
+                    onClick={() => onDelete?.(item)}
+                    disabled={!onDelete}
+                  >
                     <Trash2 className="h-4 w-4" />
                   </button>
-                  <button className="rounded-xl border border-slate-200 p-2 hover:bg-slate-50" aria-label="More actions">
+                  <button className="rounded-xl border border-slate-200 p-2 hover:bg-slate-50" aria-label="More actions" type="button">
                     <MoreHorizontal className="h-4 w-4" />
                   </button>
                 </div>

@@ -49,6 +49,16 @@ public sealed class SharedGroupsController(IMediator mediator) : ControllerBase
         return result.ToHttpResult();
     }
 
+    [HttpGet("{id:guid}/settlements")]
+    [ProducesResponseType(typeof(IReadOnlyList<SettlementHistoryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IResult> GetSettlements(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new GetGroupSettlementsQuery(CurrentUserId, id), cancellationToken);
+        return result.ToHttpResult();
+    }
+
     [HttpGet("{id:guid}/expenses")]
     [ProducesResponseType(typeof(PagedResult<SharedExpenseDto>), StatusCodes.Status200OK)]
     public async Task<IResult> GetGroupExpenses(

@@ -1,12 +1,13 @@
 export interface WalletView {
   id: string;
   name: string;
-  type: string;
+  type: WalletPayload['type'];
   currency: string;
   balance: number;
   color: string;
   icon: string;
   transactionCount: number;
+  isArchived: boolean;
 }
 
 export interface WalletPayload {

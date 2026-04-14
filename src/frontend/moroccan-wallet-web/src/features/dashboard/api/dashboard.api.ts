@@ -1,4 +1,5 @@
 import { apiClient } from '@/shared/api/client';
+import { getReminderStatus } from '@/features/reminders/lib/reminder';
 import type { PagedResult } from '@/shared/types/api';
 import type { DashboardSnapshot } from '../types/dashboard.types';
 
@@ -17,9 +18,16 @@ type ExpenseDto = {
   id: string;
   categoryId?: string | null;
   categoryName?: string | null;
+  walletId?: string | null;
+  walletName?: string | null;
   amount: number;
+  currency: string;
+  type: string;
+  paymentMethod?: string | null;
   description: string;
+  notes?: string | null;
   date: string;
+  createdAt: string;
 };
 
 type ReminderDto = {
@@ -64,65 +72,86 @@ type PriceEntryDto = {
   observedAt: string;
 };
 
-function mapReminderStatus(item: ReminderDto): 'upcoming' | 'overdue' | 'today' | 'completed' {
-  if (item.isCompleted) {
-    return 'completed';
+function getFulfilledValue<T>(result: PromiseSettledResult<{ data: T }>, fallback: T): T {
+  return result.status === 'fulfilled' ? result.value.data : fallback;
+}
+
+function toPaymentMethodLabel(paymentMethod?: string | null) {
+  const normalized = paymentMethod?.trim();
+  if (!normalized) {
+    return 'Not specified';
   }
 
-  if (item.snoozedUntil && new Date(item.snoozedUntil) > new Date()) {
-    return 'upcoming';
-  }
-
-  const due = new Date(item.dueDate);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  due.setHours(0, 0, 0, 0);
-
-  if (due.getTime() < today.getTime()) {
-    return 'overdue';
-  }
-
-  if (due.getTime() === today.getTime()) {
-    return 'today';
-  }
-
-  return 'upcoming';
+  return normalized
+    .split(/[\s-]+/)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
 }
 
 export const dashboardApi = {
   getSnapshot: async (): Promise<{ data: DashboardSnapshot }> => {
-    const [summaryResponse, transactionsResponse, remindersResponse, notificationsResponse, priceEntriesResponse, groupsResponse] =
-      await Promise.all([
-        apiClient.get<ExpenseSummaryResponse>('/transactions/summary'),
-        apiClient.get<PagedResult<ExpenseDto>>('/transactions', { params: { page: 1, pageSize: 5 } }),
-        apiClient.get<PagedResult<ReminderDto>>('/reminders', { params: { page: 1, pageSize: 6 } }),
-        apiClient.get<PagedResult<NotificationDto>>('/notifications', { params: { page: 1, pageSize: 5 } }),
-        apiClient.get<PagedResult<PriceEntryDto>>('/grocery-prices/entries', { params: { page: 1, pageSize: 5 } }),
-        apiClient.get<GroupSummaryDto[]>('/shared-expenses/groups'),
-      ]);
+    const [
+      summaryResult,
+      transactionsResult,
+      remindersResult,
+      notificationsResult,
+      priceEntriesResult,
+      groupsResult,
+    ] = await Promise.allSettled([
+      apiClient.get<ExpenseSummaryResponse>('/transactions/summary'),
+      apiClient.get<PagedResult<ExpenseDto>>('/transactions', { params: { page: 1, pageSize: 5 } }),
+      apiClient.get<PagedResult<ReminderDto>>('/reminders', { params: { page: 1, pageSize: 6 } }),
+      apiClient.get<PagedResult<NotificationDto>>('/notifications', { params: { page: 1, pageSize: 5 } }),
+      apiClient.get<PagedResult<PriceEntryDto>>('/grocery-prices/entries', { params: { page: 1, pageSize: 5 } }),
+      apiClient.get<GroupSummaryDto[]>('/shared-expenses/groups'),
+    ]);
 
-    const primaryGroup = groupsResponse.data[0] ?? null;
+    if (summaryResult.status === 'rejected') {
+      throw summaryResult.reason;
+    }
 
-    const [balancesResponse, sharedExpensesResponse] = primaryGroup
-      ? await Promise.all([
+    const summary = summaryResult.value.data;
+    const transactions = getFulfilledValue(transactionsResult, { items: [], total: 0, page: 1, pageSize: 5 });
+    const reminders = getFulfilledValue(remindersResult, { items: [], total: 0, page: 1, pageSize: 6 });
+    const notifications = getFulfilledValue(notificationsResult, { items: [], total: 0, page: 1, pageSize: 5 });
+    const priceEntries = getFulfilledValue(priceEntriesResult, { items: [], total: 0, page: 1, pageSize: 5 });
+    const groups = getFulfilledValue(groupsResult, [] as GroupSummaryDto[]);
+
+    const primaryGroup = groups[0] ?? null;
+
+    const [balancesResult, sharedExpensesResult] = primaryGroup
+      ? await Promise.allSettled([
           apiClient.get<GroupBalancesResponse>(`/shared-expenses/groups/${primaryGroup.id}/balances`),
           apiClient.get<PagedResult<SharedExpenseDto>>('/shared-expenses', {
             params: { groupId: primaryGroup.id, page: 1, pageSize: 4 },
           }),
         ])
-      : [{ data: { balances: [] } }, { data: { items: [], total: 0, page: 1, pageSize: 4 } }];
+      : [];
 
-    const monthBudget = summaryResponse.data.totalBudget;
-    const currentMonthSpent = summaryResponse.data.totalSpent;
+    const balances = primaryGroup ? getFulfilledValue(balancesResult!, { balances: [] }) : { balances: [] };
+    const sharedExpenses = primaryGroup
+      ? getFulfilledValue(sharedExpensesResult!, { items: [], total: 0, page: 1, pageSize: 4 })
+      : { items: [], total: 0, page: 1, pageSize: 4 };
+
+    const monthBudget = summary.totalBudget;
+    const currentMonthSpent = summary.totalSpent;
     const remainingBudget = Math.max(monthBudget - currentMonthSpent, 0);
-    const upcomingReminders = remindersResponse.data.items.map((item) => ({
+    const upcomingReminders = reminders.items.map((item) => ({
       id: item.id,
       title: item.title,
       dueDate: item.dueDate.slice(0, 10),
-      status: mapReminderStatus(item),
+      status: (() => {
+        const status = getReminderStatus({
+          dueDate: item.dueDate,
+          snoozedUntil: item.snoozedUntil ?? undefined,
+          isCompleted: item.isCompleted,
+          status: 'upcoming',
+        });
+        return status === 'snoozed' ? 'upcoming' : status;
+      })(),
     }));
 
-    const topCategories = summaryResponse.data.byCategory
+    const topCategories = summary.byCategory
       .sort((left, right) => right.total - left.total)
       .slice(0, 4)
       .map((item) => ({
@@ -137,19 +166,24 @@ export const dashboardApi = {
         currentMonthSpent,
         remainingBudget,
         upcomingItemsCount: upcomingReminders.filter((item) => item.status !== 'completed').length,
-        householdBalance: balancesResponse.data.balances[0]?.balance ?? 0,
+        householdBalance: balances.balances[0]?.balance ?? 0,
         monthBudget,
       },
-      recentTransactions: transactionsResponse.data.items.map((item) => ({
+      recentTransactions: transactions.items.map((item) => ({
         id: item.id,
         title: item.description,
         category: item.categoryName ?? 'Uncategorized',
         amount: item.amount,
+        currency: item.currency ?? primaryGroup?.currency ?? 'MAD',
+        type: item.type?.toLowerCase() === 'income' ? 'income' : 'expense',
         date: item.date.slice(0, 10),
+        walletLabel: item.walletName ?? 'Unassigned',
+        paymentMethodLabel: toPaymentMethodLabel(item.paymentMethod),
+        notes: item.notes ?? undefined,
         status: 'paid',
       })),
       upcomingReminders,
-      sharedActivity: sharedExpensesResponse.data.items.map((item) => ({
+      sharedActivity: sharedExpenses.items.map((item) => ({
         id: item.id,
         title: item.description,
         subtitle: `Paid by ${item.paidById}`,
@@ -157,7 +191,7 @@ export const dashboardApi = {
         createdAt: item.createdAt,
       })),
       topCategories,
-      groceryPrices: priceEntriesResponse.data.items.slice(0, 4).map((item, index, items) => ({
+      groceryPrices: priceEntries.items.slice(0, 4).map((item, index, items) => ({
         id: item.id,
         productName: item.productName,
         latestPrice: item.price,
@@ -165,7 +199,7 @@ export const dashboardApi = {
         storeName: item.storeName ?? 'Unknown store',
         updatedAt: item.observedAt,
       })),
-      notifications: notificationsResponse.data.items.map((item) => ({
+      notifications: notifications.items.map((item) => ({
         id: item.id,
         title: item.title,
         message: item.body ?? '',

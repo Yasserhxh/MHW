@@ -1,6 +1,7 @@
 import { apiClient } from '@/shared/api/client';
 import type { PagedResult } from '@/shared/types/api';
 import type { CreateReminderRequest, Reminder } from '../types/reminders.types';
+import { getReminderStatus, mapReminderCategory, mapReminderFrequency, toReminderEnumValue } from '../lib/reminder';
 
 type ReminderDto = {
   id: string;
@@ -16,54 +17,38 @@ type ReminderDto = {
   createdAt: string;
 };
 
-function mapFrequency(value: string): Reminder['recurrence'] {
-  const normalized = value.toLowerCase();
-  if (normalized === 'daily' || normalized === 'weekly' || normalized === 'monthly') {
-    return normalized;
-  }
-  return 'none';
-}
-
-function mapStatus(item: ReminderDto): Reminder['status'] {
-  if (item.isCompleted) {
-    return 'completed';
-  }
-
-  const due = new Date(item.dueDate);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const dueDay = new Date(due);
-  dueDay.setHours(0, 0, 0, 0);
-
-  if (item.snoozedUntil && new Date(item.snoozedUntil) > new Date()) {
-    return 'snoozed';
-  }
-  if (dueDay.getTime() < today.getTime()) {
-    return 'overdue';
-  }
-  if (dueDay.getTime() === today.getTime()) {
-    return 'today';
-  }
-  return 'upcoming';
-}
-
 function toReminder(item: ReminderDto): Reminder {
   return {
     id: item.id,
     title: item.title,
     description: item.description ?? undefined,
     dueDate: item.dueDate.slice(0, 10),
-    recurrence: mapFrequency(item.frequency),
-    status: mapStatus(item),
+    recurrence: mapReminderFrequency(item.frequency),
+    status: getReminderStatus({
+      dueDate: item.dueDate,
+      snoozedUntil: item.snoozedUntil ?? undefined,
+      isCompleted: item.isCompleted,
+      completedAt: item.completedAt,
+      status: 'upcoming',
+    }),
     amount: item.amount ?? undefined,
     currency: item.amount ? 'MAD' : undefined,
+    snoozedUntil: item.snoozedUntil ?? undefined,
     completedAt: item.completedAt ?? undefined,
     createdAt: item.createdAt,
-    category: item.type,
+    category: mapReminderCategory(item.type),
     notes: item.description ?? undefined,
-    priority: 'medium',
-    notifyByEmail: false,
+  };
+}
+
+function toReminderRequest(payload: CreateReminderRequest) {
+  return {
+    title: payload.title,
+    description: payload.notes ?? payload.description ?? null,
+    type: toReminderEnumValue(payload.category ?? 'custom'),
+    amount: payload.amount ?? null,
+    dueDate: payload.dueDate,
+    frequency: toReminderEnumValue(payload.recurrence ?? 'once'),
   };
 }
 
@@ -81,14 +66,7 @@ export const remindersApi = {
   },
 
   save: async (payload: CreateReminderRequest, id?: string) => {
-    const request = {
-      title: payload.title,
-      description: payload.notes ?? payload.description ?? null,
-      type: payload.category ?? 'custom',
-      amount: payload.amount ?? null,
-      dueDate: payload.dueDate,
-      frequency: payload.recurrence === 'none' ? 'none' : payload.recurrence,
-    };
+    const request = toReminderRequest(payload);
 
     if (id) {
       await apiClient.put(`/reminders/${id}`, request);
@@ -98,12 +76,9 @@ export const remindersApi = {
     return apiClient.post('/reminders', request);
   },
 
-  markComplete: async (id: string) => {
-    return apiClient.post(`/reminders/${id}/complete`);
-  },
+  markComplete: async (id: string) => apiClient.post(`/reminders/${id}/complete`),
 
-  snooze: async (id: string) => {
-    const until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    return apiClient.post(`/reminders/${id}/snooze`, { until });
-  },
+  snooze: async (id: string, until: string) => apiClient.post(`/reminders/${id}/snooze`, { until }),
+
+  remove: async (id: string) => apiClient.delete(`/reminders/${id}`),
 };

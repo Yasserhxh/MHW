@@ -1,5 +1,10 @@
 import { apiClient } from '@/shared/api/client';
 import { useAuthStore } from '@/features/auth/store/auth.store';
+import type {
+  NotificationSettingsValues,
+  PreferenceSettingsValues,
+  ProfileSettingsValues,
+} from '../types/settings.types';
 
 type ProfileResponse = {
   userId: string;
@@ -20,25 +25,9 @@ type PreferencesResponse = {
   householdMode: string;
 };
 
-type ProfilePayload = { fullName: string; email: string; language: string; timezone: string };
-type PreferencePayload = {
-  currency?: string;
-  defaultWalletId?: string;
-  salaryDay?: number;
-  dashboardCompactMode?: boolean;
-  householdDefaults?: string;
-};
-type NotificationSettingsPayload = {
-  reminderInApp?: boolean;
-  reminderEmail?: boolean;
-  sharedExpenseInApp?: boolean;
-  budgetWarningInApp?: boolean;
-  weeklyDigestEmail?: boolean;
-};
-
 const notificationPreferenceKey = 'mhw-notification-preferences';
 
-const defaultNotificationPreferences: Required<NotificationSettingsPayload> = {
+const defaultNotificationPreferences: Required<NotificationSettingsValues> = {
   reminderInApp: true,
   reminderEmail: true,
   sharedExpenseInApp: true,
@@ -66,7 +55,7 @@ function readNotificationPreferences() {
   }
 }
 
-function writeNotificationPreferences(payload: NotificationSettingsPayload) {
+function writeNotificationPreferences(payload: NotificationSettingsValues) {
   const next = {
     ...readNotificationPreferences(),
     ...payload,
@@ -85,11 +74,11 @@ export const settingsApi = {
         email: auth.email ?? '',
         language: data.language,
         timezone: data.timezone,
-      },
+      } satisfies ProfileSettingsValues,
     };
   },
 
-  saveProfile: async (payload: ProfilePayload) => {
+  saveProfile: async (payload: ProfileSettingsValues) => {
     const { data } = await apiClient.put('/users/profile', {
       displayName: payload.fullName,
       avatarUrl: null,
@@ -103,30 +92,32 @@ export const settingsApi = {
     const { data } = await apiClient.get<PreferencesResponse>('/users/preferences');
     return {
       data: {
+        locale: data.locale,
         currency: data.preferredCurrency,
+        timezone: data.timezone,
+        monthlyBudgetPreference: data.monthlyBudgetPreference ?? null,
         defaultWalletId: '',
-        salaryDay: data.salaryDay ?? 28,
+        salaryDay: data.salaryDay ?? null,
         dashboardCompactMode: false,
-        householdDefaults: data.householdMode,
+        householdMode: data.householdMode,
         notifications: readNotificationPreferences(),
-      },
+      } satisfies PreferenceSettingsValues,
     };
   },
 
-  savePreferences: async (payload: PreferencePayload) => {
-    const current = await apiClient.get<PreferencesResponse>('/users/preferences');
+  savePreferences: async (payload: PreferenceSettingsValues) => {
     const { data } = await apiClient.put('/users/preferences', {
-      locale: current.data.locale,
-      preferredCurrency: payload.currency ?? current.data.preferredCurrency,
-      timezone: current.data.timezone,
-      monthlyBudgetPreference: current.data.monthlyBudgetPreference ?? null,
-      salaryDay: payload.salaryDay ?? current.data.salaryDay ?? null,
-      householdMode: payload.householdDefaults ?? current.data.householdMode,
+      locale: payload.locale,
+      preferredCurrency: payload.currency,
+      timezone: payload.timezone,
+      monthlyBudgetPreference: payload.monthlyBudgetPreference ?? null,
+      salaryDay: payload.salaryDay ?? null,
+      householdMode: payload.householdMode,
     });
     return { data };
   },
 
-  saveNotificationSettings: async (payload: NotificationSettingsPayload) => {
+  saveNotificationSettings: async (payload: NotificationSettingsValues) => {
     return { data: writeNotificationPreferences(payload) };
   },
 };

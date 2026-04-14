@@ -11,7 +11,12 @@ export interface DashboardRecentTransaction {
   title: string;
   category: string;
   amount: number;
+  currency: string;
+  type: 'expense' | 'income';
   date: string;
+  walletLabel: string;
+  paymentMethodLabel: string;
+  notes?: string;
   status: 'paid' | 'upcoming' | 'overdue';
 }
 

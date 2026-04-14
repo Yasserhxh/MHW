@@ -1,31 +1,41 @@
-export interface Product {
+export interface GroceryProductListItem {
   id: string;
   name: string;
-  category: string;
-  unit: string;
+  category?: string;
+  unit?: string;
   isFavorite: boolean;
   latestPrice: number | null;
+  latestCurrency: string | null;
   cheapestRecentPrice: number | null;
   lastUpdated: string | null;
+  latestStoreName?: string;
 }
 
-export interface PriceEntry {
+export interface GroceryPriceHistoryEntry {
   id: string;
-  productId: string;
-  productName: string;
   price: number;
   currency: string;
-  storeName: string;
+  storeName?: string;
   recordedAt: string;
-  notes?: string;
 }
 
-export interface GroceryPriceListItem extends PriceEntry {
-  productName: string;
-  storeName: string;
-  unit: string;
-  date: string;
+export interface GroceryProductDetail {
+  id: string;
+  name: string;
+  category?: string;
+  unit?: string;
   isFavorite: boolean;
+  latestPrice: number | null;
+  latestCurrency: string | null;
+  cheapestRecentPrice: number | null;
+  lastUpdated: string | null;
+  history: GroceryPriceHistoryEntry[];
+}
+
+export interface GroceryFilters {
+  search?: string;
+  category?: string;
+  favoritesOnly?: boolean;
 }
 
 export interface AddPriceRequest {
@@ -35,7 +45,7 @@ export interface AddPriceRequest {
   productUnit?: string;
   price: number;
   currency: string;
-  storeName: string;
+  storeName?: string;
   notes?: string;
   date?: string;
 }

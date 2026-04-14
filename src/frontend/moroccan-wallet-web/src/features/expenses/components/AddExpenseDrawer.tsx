@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { useEffect, useMemo } from 'react';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Drawer } from '@/shared/components/ui/Drawer';
 import { Input } from '@/shared/components/ui/Input';
@@ -14,7 +14,11 @@ interface AddExpenseDrawerProps {
   categories: CategoryOption[];
   wallets: WalletOption[];
   paymentMethods: PaymentMethodOption[];
+  initialValues?: Partial<ExpenseFormValues>;
   submitting?: boolean;
+  title?: string;
+  submitLabel?: string;
+  errorMessage?: string;
 }
 
 export function AddExpenseDrawer({
@@ -24,44 +28,65 @@ export function AddExpenseDrawer({
   categories,
   wallets,
   paymentMethods,
+  initialValues,
   submitting = false,
+  title = 'Quick add transaction',
+  submitLabel = 'Save transaction',
+  errorMessage,
 }: AddExpenseDrawerProps) {
   const {
     register,
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
     defaultValues: {
-        title: '',
-        amount: 0,
-        type: 'expense',
-        category: categories[0]?.id ?? 'uncategorized',
-        walletId: 'main-wallet',
-        paymentMethodId: 'card',
-        date: new Date().toISOString().slice(0, 10),
+      title: '',
+      amount: 0,
+      type: 'expense',
+      category: categories[0]?.id ?? 'uncategorized',
+      walletId: wallets[0]?.id ?? 'unassigned',
+      paymentMethodId: paymentMethods[0]?.id ?? 'cash',
+      date: new Date().toISOString().slice(0, 10),
       notes: '',
     },
   });
+  const selectedType = useWatch({ control, name: 'type' });
+  const selectedCategory = useWatch({ control, name: 'category' });
+
+  const filteredCategories = useMemo(() => {
+    const matches = categories.filter((category) => !category.type || category.type === selectedType);
+    return matches.length ? matches : categories;
+  }, [categories, selectedType]);
 
   useEffect(() => {
     if (open) {
       reset({
-        title: '',
-        amount: 0,
-        type: 'expense',
-        category: categories[0]?.id ?? 'uncategorized',
-        walletId: wallets[0]?.id ?? 'main-wallet',
-        paymentMethodId: paymentMethods[0]?.id ?? 'card',
-        date: new Date().toISOString().slice(0, 10),
-        notes: '',
+        title: initialValues?.title ?? '',
+        amount: initialValues?.amount ?? 0,
+        type: initialValues?.type ?? 'expense',
+        category: initialValues?.category ?? categories[0]?.id ?? 'uncategorized',
+        walletId: initialValues?.walletId ?? wallets[0]?.id ?? 'unassigned',
+        paymentMethodId: initialValues?.paymentMethodId ?? paymentMethods[0]?.id ?? 'cash',
+        date: initialValues?.date ?? new Date().toISOString().slice(0, 10),
+        notes: initialValues?.notes ?? '',
       });
     }
-  }, [categories, open, paymentMethods, reset, wallets]);
+  }, [categories, initialValues, open, paymentMethods, reset, wallets]);
+
+  useEffect(() => {
+    if (!filteredCategories.some((category) => category.id === selectedCategory)) {
+      setValue('category', filteredCategories[0]?.id ?? 'uncategorized');
+    }
+  }, [filteredCategories, selectedCategory, setValue]);
 
   const submit = handleSubmit(async (values) => {
+    if (submitting) {
+      return;
+    }
     await onSubmit(values);
     onClose();
   });
@@ -70,7 +95,7 @@ export function AddExpenseDrawer({
     <Drawer
       open={open}
       onClose={onClose}
-      title="Quick add transaction"
+      title={title}
       width="lg"
       footer={
         <>
@@ -78,7 +103,7 @@ export function AddExpenseDrawer({
             Cancel
           </Button>
           <Button form="quick-add-expense-form" type="submit" loading={submitting}>
-            Save transaction
+            {submitLabel}
           </Button>
         </>
       }
@@ -95,6 +120,8 @@ export function AddExpenseDrawer({
             {...register('amount', { valueAsNumber: true })}
           />
         </div>
+
+        {errorMessage ? <div className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{errorMessage}</div> : null}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Controller
@@ -117,7 +144,7 @@ export function AddExpenseDrawer({
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-slate-700">Category</label>
                 <select {...field} className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500">
-                  {categories.map((option) => (
+                  {filteredCategories.map((option) => (
                     <option key={option.id} value={option.id}>
                       {option.label}
                     </option>

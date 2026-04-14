@@ -1,20 +1,25 @@
 import { ChevronRight, ShoppingBasket, WalletCards } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { usePreferenceSettings } from '@/features/settings/hooks/useSettings';
 import { AppPageHeader } from '@/shared/components/AppPageHeader';
 import { DashboardKpiRow } from '@/shared/components/DashboardKpiRow';
 import { DashboardPreviewList } from '@/shared/components/DashboardPreviewList';
-import { LoadingState } from '@/shared/components/LoadingState';
 import { ErrorState } from '@/shared/components/ErrorState';
-import { QuickAddButton } from '@/shared/components/common';
+import { LoadingState } from '@/shared/components/LoadingState';
+import { ReminderList } from '@/shared/components/ReminderList';
 import { SectionCard } from '@/shared/components/SectionCard';
 import { TransactionList } from '@/shared/components/TransactionList';
-import { ReminderList } from '@/shared/components/ReminderList';
 import { CurrencyAmount } from '@/shared/components/CurrencyAmount';
-import { useDashboardSnapshot } from '../hooks/useDashboard';
+import { QuickAddButton } from '@/shared/components/common';
 import { formatCurrency, formatRelativeDate } from '@/shared/utils/format';
+import { useDashboardSnapshot } from '../hooks/useDashboard';
 
 export default function DashboardPage() {
   const { data, isLoading, isError, refetch } = useDashboardSnapshot();
+  const { data: preferences } = usePreferenceSettings();
+  const currency = preferences?.currency ?? 'MAD';
+  const locale = preferences?.locale ?? 'fr-MA';
+  const formatMoney = (amount: number) => formatCurrency(amount, currency, locale);
 
   if (isLoading) {
     return <LoadingState message="Loading your household snapshot..." />;
@@ -28,14 +33,17 @@ export default function DashboardPage() {
     {
       id: 'spent',
       label: 'Current Month Spent',
-      value: formatCurrency(data.summary.currentMonthSpent),
-      hint: `${Math.round((data.summary.currentMonthSpent / data.summary.monthBudget) * 100)}% of budget used`,
+      value: formatMoney(data.summary.currentMonthSpent),
+      hint:
+        data.summary.monthBudget > 0
+          ? `${Math.round((data.summary.currentMonthSpent / data.summary.monthBudget) * 100)}% of budget used`
+          : 'No monthly budget set yet',
       tone: 'warning' as const,
     },
     {
       id: 'remaining',
       label: 'Remaining Budget',
-      value: formatCurrency(data.summary.remainingBudget),
+      value: formatMoney(data.summary.remainingBudget),
       hint: 'Available for the rest of this month',
       tone: 'success' as const,
     },
@@ -49,7 +57,7 @@ export default function DashboardPage() {
     {
       id: 'household',
       label: 'Household Balance',
-      value: formatCurrency(Math.abs(data.summary.householdBalance)),
+      value: formatMoney(Math.abs(data.summary.householdBalance)),
       hint: data.summary.householdBalance < 0 ? 'You currently owe the household' : 'Household owes you',
       tone: data.summary.householdBalance < 0 ? 'danger' : 'success',
     },
@@ -57,15 +65,11 @@ export default function DashboardPage() {
 
   const transactionItems = data.recentTransactions.map((item) => ({
     ...item,
-    currency: 'MAD',
-    type: 'expense' as const,
-    walletId: 'main-wallet' as const,
-    paymentMethodId: 'card' as const,
+    walletId: `dashboard-wallet-${item.id}` as const,
+    paymentMethodId: item.paymentMethodLabel.toLowerCase().replace(/\s+/g, '-') as const,
     createdAt: item.date,
     dateLabel: item.date,
     categoryLabel: item.category,
-    walletLabel: 'Main Wallet',
-    paymentMethodLabel: 'Card',
   }));
 
   return (
@@ -87,7 +91,7 @@ export default function DashboardPage() {
             </Link>
           }
         >
-          <TransactionList items={transactionItems} />
+          <TransactionList items={transactionItems} getDetailHref={(item) => `/expenses/${item.id}`} />
         </SectionCard>
 
         <SectionCard title="Upcoming reminders">
@@ -104,19 +108,23 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
         <SectionCard title="Spending overview">
-          <div className="space-y-4">
-            {data.topCategories.map((category) => (
-              <div key={category.id}>
-                <div className="mb-2 flex items-center justify-between text-sm">
-                  <span className="font-medium text-slate-700">{category.label}</span>
-                  <span className="text-slate-500">{formatCurrency(category.amount)}</span>
+          {data.topCategories.length ? (
+            <div className="space-y-4">
+              {data.topCategories.map((category) => (
+                <div key={category.id}>
+                  <div className="mb-2 flex items-center justify-between text-sm">
+                    <span className="font-medium text-slate-700">{category.label}</span>
+                    <span className="text-slate-500">{formatMoney(category.amount)}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-100">
+                    <div className="h-2 rounded-full bg-teal-600" style={{ width: `${category.percent}%` }} />
+                  </div>
                 </div>
-                <div className="h-2 rounded-full bg-slate-100">
-                  <div className="h-2 rounded-full bg-teal-600" style={{ width: `${category.percent}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <DashboardPreviewList items={[]} emptyLabel="No spending recorded this month yet." />
+          )}
         </SectionCard>
 
         <SectionCard title="Shared activity">
@@ -125,8 +133,10 @@ export default function DashboardPage() {
               id: activity.id,
               title: activity.title,
               subtitle: activity.subtitle,
-              meta: formatCurrency(activity.amount),
+              meta: formatMoney(activity.amount),
+              href: `/shared-expenses/${activity.id}`,
             }))}
+            emptyLabel="No shared expense activity yet."
           />
         </SectionCard>
       </div>
@@ -137,10 +147,12 @@ export default function DashboardPage() {
             items={data.groceryPrices.map((item) => ({
               id: item.id,
               title: item.productName,
-              subtitle: `${item.storeName} · was ${formatCurrency(item.previousPrice)}`,
-              meta: formatCurrency(item.latestPrice),
+              subtitle: `${item.storeName} · was ${formatMoney(item.previousPrice)}`,
+              meta: formatMoney(item.latestPrice),
               tone: item.latestPrice <= item.previousPrice ? 'success' : 'warning',
+              href: '/grocery-prices',
             }))}
+            emptyLabel="No grocery price updates yet."
           />
         </SectionCard>
 
@@ -152,7 +164,9 @@ export default function DashboardPage() {
               subtitle: notification.message,
               meta: formatRelativeDate(notification.createdAt),
               tone: notification.status === 'unread' ? 'warning' : 'default',
+              href: '/notifications',
             }))}
+            emptyLabel="No new notifications right now."
           />
         </SectionCard>
 
@@ -165,6 +179,7 @@ export default function DashboardPage() {
             <div className="mt-4 text-3xl font-semibold tracking-tight">
               <CurrencyAmount
                 amount={data.summary.householdBalance}
+                currency={currency}
                 negative={data.summary.householdBalance < 0}
                 positive={data.summary.householdBalance > 0}
                 className="text-white"

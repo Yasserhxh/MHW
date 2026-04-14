@@ -1,5 +1,14 @@
-export type ReminderFrequency = 'none' | 'daily' | 'weekly' | 'monthly';
+export type ReminderFrequency = 'once' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 export type ReminderStatus = 'upcoming' | 'today' | 'overdue' | 'completed' | 'snoozed';
+export type ReminderCategory =
+  | 'rent'
+  | 'internet'
+  | 'electricity'
+  | 'water'
+  | 'school'
+  | 'grocery'
+  | 'insurance'
+  | 'custom';
 
 export interface Reminder {
   id: string;
@@ -10,12 +19,11 @@ export interface Reminder {
   status: ReminderStatus;
   amount?: number;
   currency?: string;
+  snoozedUntil?: string;
   completedAt?: string;
   createdAt: string;
-  category: string;
+  category: ReminderCategory;
   notes?: string;
-  priority: 'medium';
-  notifyByEmail: false;
 }
 
 export interface CreateReminderRequest {
@@ -25,6 +33,6 @@ export interface CreateReminderRequest {
   recurrence: ReminderFrequency;
   amount?: number;
   currency?: string;
-  category?: string;
+  category?: ReminderCategory;
   notes?: string;
 }

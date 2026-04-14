@@ -3,10 +3,12 @@ import type { PagedResult } from '@/shared/types/api';
 import type {
   CreateExpenseRequest,
   ExpenseCategoryBreakdown,
+  ExpenseFilters,
   ExpenseDetail,
   ExpensesSnapshot,
   ExpenseTransactionListItem,
   PaymentMethodOption,
+  UpdateExpenseRequest,
 } from '../types/expenses.types';
 
 type ExpenseSummaryResponse = {
@@ -34,6 +36,7 @@ type ExpenseDto = {
   type: string;
   paymentMethod?: string | null;
   description: string;
+  notes?: string | null;
   date: string;
   isRecurring: boolean;
   tags?: string | null;
@@ -48,7 +51,29 @@ type WalletDto = {
 type CategoryDto = {
   id: string;
   name: string;
+  type?: string;
 };
+
+function toIsoDate(date: string) {
+  return new Date(`${date}T00:00:00.000Z`).toISOString();
+}
+
+function buildRange(dateRange?: ExpenseFilters['dateRange']) {
+  const now = new Date();
+
+  if (dateRange === 'last-30-days') {
+    const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 30));
+    return { from: from.toISOString(), to: now.toISOString() };
+  }
+
+  if (dateRange === 'last-90-days') {
+    const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 90));
+    return { from: from.toISOString(), to: now.toISOString() };
+  }
+
+  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  return { from: from.toISOString(), to: now.toISOString() };
+}
 
 function toPaymentMethodId(paymentMethod?: string | null) {
   return (paymentMethod?.trim().toLowerCase().replace(/\s+/g, '-') || 'cash') as string;
@@ -74,7 +99,7 @@ function toTransactionItem(expense: ExpenseDto): ExpenseTransactionListItem {
     walletId: expense.walletId ?? 'unassigned',
     paymentMethodId,
     date: expense.date,
-    notes: expense.tags ?? undefined,
+    notes: expense.notes ?? expense.tags ?? undefined,
     createdAt: expense.createdAt,
     dateLabel: expense.date.slice(0, 10),
     categoryLabel: expense.categoryName ?? 'Uncategorized',
@@ -95,7 +120,12 @@ function buildCategoryBreakdown(summary: ExpenseSummaryResponse): ExpenseCategor
 }
 
 function buildPaymentMethods(items: ExpenseTransactionListItem[]): PaymentMethodOption[] {
-  const map = new Map<string, PaymentMethodOption>();
+  const map = new Map<string, PaymentMethodOption>([
+    ['cash', { id: 'cash', label: 'Cash' }],
+    ['card', { id: 'card', label: 'Card' }],
+    ['bank-transfer', { id: 'bank-transfer', label: 'Bank Transfer' }],
+    ['wallet-transfer', { id: 'wallet-transfer', label: 'Wallet Transfer' }],
+  ]);
 
   for (const item of items) {
     if (!map.has(item.paymentMethodId)) {
@@ -106,18 +136,25 @@ function buildPaymentMethods(items: ExpenseTransactionListItem[]): PaymentMethod
     }
   }
 
-  if (!map.size) {
-    map.set('cash', { id: 'cash', label: 'Cash' });
-  }
-
   return Array.from(map.values());
 }
 
 export const expensesApi = {
-  getSnapshot: async () => {
+  getSnapshot: async (filters: ExpenseFilters = {}) => {
+    const range = buildRange(filters.dateRange);
+
     const [summaryResponse, transactionsResponse, walletsResponse, categoriesResponse] = await Promise.all([
       apiClient.get<ExpenseSummaryResponse>('/transactions/summary'),
-      apiClient.get<PagedResult<ExpenseDto>>('/transactions', { params: { page: 1, pageSize: 100 } }),
+      apiClient.get<PagedResult<ExpenseDto>>('/transactions', {
+        params: {
+          page: 1,
+          pageSize: 100,
+          search: filters.search || undefined,
+          categoryId: filters.category && filters.category !== 'all' ? filters.category : undefined,
+          from: range.from,
+          to: range.to,
+        },
+      }),
       apiClient.get<WalletDto[]>('/wallets'),
       apiClient.get<CategoryDto[]>('/categories'),
     ]);
@@ -140,6 +177,7 @@ export const expensesApi = {
       categories: categoriesResponse.data.map((category) => ({
         id: category.id,
         label: category.name,
+        type: category.type?.toLowerCase() === 'income' ? 'income' : 'expense',
       })),
       wallets: walletsResponse.data.map((wallet) => ({
         id: wallet.id,
@@ -157,6 +195,7 @@ export const expensesApi = {
       data: {
         ...toTransactionItem(data),
         isRecurring: data.isRecurring,
+        notes: data.notes ?? data.tags ?? undefined,
         tags: data.tags ?? undefined,
       } satisfies ExpenseDetail,
     };
@@ -172,11 +211,31 @@ export const expensesApi = {
       paymentMethod: payload.paymentMethodId,
       description: payload.title,
       notes: payload.notes ?? null,
-      date: payload.date,
+      date: toIsoDate(payload.date),
       isRecurring: false,
-      tags: payload.notes ?? null,
+      tags: null,
     });
 
     return { data };
+  },
+
+  update: async (payload: UpdateExpenseRequest) => {
+    await apiClient.put(`/transactions/${payload.id}`, {
+      categoryId: payload.category === 'uncategorized' ? null : payload.category,
+      walletId: payload.walletId === 'unassigned' ? null : payload.walletId,
+      amount: payload.amount,
+      currency: 'MAD',
+      type: payload.type,
+      paymentMethod: payload.paymentMethodId,
+      description: payload.title,
+      notes: payload.notes ?? null,
+      date: toIsoDate(payload.date),
+      isRecurring: false,
+      tags: null,
+    });
+  },
+
+  remove: async (id: string) => {
+    await apiClient.delete(`/transactions/${id}`);
   },
 };

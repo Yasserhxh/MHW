@@ -24,6 +24,10 @@ function toNotification(item: NotificationDto): AppNotification {
   };
 }
 
+export function mapNotificationDto(item: NotificationDto): AppNotification {
+  return toNotification(item);
+}
+
 export const notificationsApi = {
   list: async () => {
     const { data } = await apiClient.get<PagedResult<NotificationDto>>('/notifications', {
@@ -33,7 +37,8 @@ export const notificationsApi = {
   },
 
   unreadCount: async () => {
-    return apiClient.get<{ count: number }>('/notifications/unread-count');
+    const { data } = await apiClient.get<{ count: number }>('/notifications/unread-count');
+    return { data: data.count };
   },
 
   markRead: (id: string) => apiClient.post(`/notifications/${id}/read`),

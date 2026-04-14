@@ -15,6 +15,7 @@ import { AddExpenseDrawer } from '../components/AddExpenseDrawer';
 import { useCreateExpense, useExpensesSnapshot } from '../hooks/useExpenses';
 import type { ExpenseFilters } from '../types/expenses.types';
 import { formatCurrency } from '@/shared/utils/format';
+import { normalizeApiError } from '@/shared/utils/error';
 
 export default function ExpensesPage() {
   const location = useLocation();
@@ -23,11 +24,13 @@ export default function ExpensesPage() {
   const [filters, setFilters] = useState<ExpenseFilters>({
     search: '',
     dateRange: 'this-month',
+    type: 'all',
     category: 'all',
     walletId: 'all',
     paymentMethodId: 'all',
   });
-  const { data, isLoading, isError, refetch } = useExpensesSnapshot();
+  const [submitError, setSubmitError] = useState('');
+  const { data, isLoading, isError, refetch } = useExpensesSnapshot(filters);
   const createExpense = useCreateExpense();
 
   useEffect(() => {
@@ -41,15 +44,67 @@ export default function ExpensesPage() {
     if (!data) return [];
 
     return data.transactions.filter((transaction) => {
-      const matchesSearch = filters.search
-        ? `${transaction.title} ${transaction.notes ?? ''}`.toLowerCase().includes(filters.search.toLowerCase())
-        : true;
-      const matchesCategory = filters.category === 'all' ? true : transaction.category === filters.category;
+      const matchesType = filters.type === 'all' ? true : transaction.type === filters.type;
       const matchesWallet = filters.walletId === 'all' ? true : transaction.walletId === filters.walletId;
       const matchesPayment = filters.paymentMethodId === 'all' ? true : transaction.paymentMethodId === filters.paymentMethodId;
-      return matchesSearch && matchesCategory && matchesWallet && matchesPayment;
+      return matchesType && matchesWallet && matchesPayment;
     });
   }, [data, filters]);
+
+  const visibleSummary = useMemo(() => {
+    const spentThisMonth = filteredTransactions
+      .filter((transaction) => transaction.type === 'expense')
+      .reduce((sum, transaction) => sum + transaction.amount, 0);
+    const incomeThisMonth = filteredTransactions
+      .filter((transaction) => transaction.type === 'income')
+      .reduce((sum, transaction) => sum + transaction.amount, 0);
+
+    const categoryTotals = new Map<string, { label: string; amount: number }>();
+    for (const transaction of filteredTransactions) {
+      const current = categoryTotals.get(transaction.category) ?? {
+        label: transaction.categoryLabel,
+        amount: 0,
+      };
+      current.amount += transaction.amount;
+      categoryTotals.set(transaction.category, current);
+    }
+
+    const topCategory = Array.from(categoryTotals.values()).sort((left, right) => right.amount - left.amount)[0];
+
+    return {
+      spentThisMonth,
+      incomeThisMonth,
+      transactionCount: filteredTransactions.length,
+      topCategoryLabel: topCategory?.label ?? 'No categories yet',
+    };
+  }, [filteredTransactions]);
+
+  const visibleCategoryBreakdown = useMemo(() => {
+    const totals = new Map<string, { label: string; amount: number }>();
+
+    for (const transaction of filteredTransactions) {
+      const current = totals.get(transaction.category) ?? {
+        label: transaction.categoryLabel,
+        amount: 0,
+      };
+      current.amount += transaction.amount;
+      totals.set(transaction.category, current);
+    }
+
+    const entries = Array.from(totals.entries()).map(([category, value]) => ({
+      category,
+      label: value.label,
+      amount: value.amount,
+    }));
+    const max = entries.reduce((current, item) => Math.max(current, item.amount), 0);
+
+    return entries
+      .sort((left, right) => right.amount - left.amount)
+      .map((item) => ({
+        ...item,
+        percent: max > 0 ? Math.max(8, Math.round((item.amount / max) * 100)) : 0,
+      }));
+  }, [filteredTransactions]);
 
   if (isLoading) {
     return <LoadingState message="Loading transactions..." />;
@@ -66,7 +121,7 @@ export default function ExpensesPage() {
         subtitle="Browse personal transactions, filter quickly, and capture a new expense without leaving the page."
         action={
           <div className="flex flex-wrap gap-2">
-            <button className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-sm">
+            <button type="button" className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-sm">
               <Download className="h-4 w-4" />
               Export
             </button>
@@ -76,14 +131,14 @@ export default function ExpensesPage() {
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total spent this month" value={formatCurrency(data.summary.spentThisMonth)} hint="Personal expenses only" tone="warning" />
-        <StatCard label="Total income this month" value={formatCurrency(data.summary.incomeThisMonth)} hint="Incoming cash tracked" tone="success" />
-        <StatCard label="Transaction count" value={`${data.summary.transactionCount}`} hint="All recorded entries" tone="info" />
-        <StatCard label="Top category" value={data.summary.topCategoryLabel} hint="Largest spending bucket" tone="muted" />
+        <StatCard label="Total spent" value={formatCurrency(visibleSummary.spentThisMonth)} hint="Visible expense entries" tone="warning" />
+        <StatCard label="Total income" value={formatCurrency(visibleSummary.incomeThisMonth)} hint="Visible income entries" tone="success" />
+        <StatCard label="Transaction count" value={`${visibleSummary.transactionCount}`} hint="Currently visible entries" tone="info" />
+        <StatCard label="Top category" value={visibleSummary.topCategoryLabel} hint="Largest visible bucket" tone="muted" />
       </div>
 
       <FilterBar>
-        <div className="grid gap-3 lg:grid-cols-5">
+        <div className="grid gap-3 lg:grid-cols-6">
           <div className="relative lg:col-span-2">
             <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
             <input
@@ -101,6 +156,15 @@ export default function ExpensesPage() {
             <option value="this-month">This month</option>
             <option value="last-30-days">Last 30 days</option>
             <option value="last-90-days">Last 90 days</option>
+          </select>
+          <select
+            className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            value={filters.type}
+            onChange={(event) => setFilters((current) => ({ ...current, type: event.target.value as ExpenseFilters['type'] }))}
+          >
+            <option value="all">All types</option>
+            <option value="expense">Expenses</option>
+            <option value="income">Income</option>
           </select>
           <select
             className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -140,12 +204,14 @@ export default function ExpensesPage() {
               </option>
             ))}
           </select>
-          <button
-            className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-600"
-            onClick={() =>
-              setFilters({
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-600"
+              onClick={() =>
+                setFilters({
                 search: '',
                 dateRange: 'this-month',
+                type: 'all',
                 category: 'all',
                 walletId: 'all',
                 paymentMethodId: 'all',
@@ -162,6 +228,7 @@ export default function ExpensesPage() {
           title="Transactions"
           action={
             <button
+              type="button"
               className="inline-flex items-center gap-2 rounded-2xl bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white"
               onClick={() => setQuickAddOpen(true)}
             >
@@ -172,9 +239,14 @@ export default function ExpensesPage() {
         >
           {filteredTransactions.length ? (
             <>
-              <TransactionTable items={filteredTransactions} />
+              <TransactionTable
+                items={filteredTransactions}
+                getDetailHref={(item) => `/expenses/${item.id}`}
+                onEdit={(item) => navigate(`/expenses/${item.id}`)}
+                onDelete={(item) => navigate(`/expenses/${item.id}`)}
+              />
               <div className="lg:hidden">
-                <TransactionList items={filteredTransactions} />
+                <TransactionList items={filteredTransactions} getDetailHref={(item) => `/expenses/${item.id}`} />
               </div>
             </>
           ) : (
@@ -189,7 +261,7 @@ export default function ExpensesPage() {
 
         <SectionCard title="Category summary">
           <div className="space-y-4">
-            {data.categoryBreakdown.map((item) => (
+            {visibleCategoryBreakdown.map((item) => (
               <div key={item.category}>
                 <div className="mb-2 flex items-center justify-between text-sm">
                   <span className="font-medium text-slate-700">{item.label}</span>
@@ -200,6 +272,11 @@ export default function ExpensesPage() {
                 </div>
               </div>
             ))}
+            {!visibleCategoryBreakdown.length ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-sm text-slate-500">
+                Category totals will appear once matching transactions are available.
+              </div>
+            ) : null}
           </div>
         </SectionCard>
       </div>
@@ -212,8 +289,15 @@ export default function ExpensesPage() {
         paymentMethods={data.paymentMethods}
         submitting={createExpense.isPending}
         onSubmit={async (values) => {
-          await createExpense.mutateAsync(values);
+          setSubmitError('');
+          try {
+            await createExpense.mutateAsync(values);
+          } catch (error) {
+            setSubmitError(normalizeApiError(error).message);
+            throw error;
+          }
         }}
+        errorMessage={submitError}
       />
     </div>
   );

@@ -39,6 +39,7 @@ function toWalletView(wallet: WalletDto, transactionCount: number): WalletView {
     color: wallet.color ?? 'teal',
     icon: wallet.icon ?? 'wallet',
     transactionCount,
+    isArchived: wallet.isArchived,
   };
 }
 
@@ -56,9 +57,9 @@ async function getTransactionCounts() {
 }
 
 export const walletsApi = {
-  list: async () => {
+  list: async (includeArchived = false) => {
     const [walletsResponse, counts] = await Promise.all([
-      apiClient.get<WalletDto[]>('/wallets'),
+      apiClient.get<WalletDto[]>('/wallets', { params: { includeArchived } }),
       getTransactionCounts(),
     ]);
 
@@ -96,5 +97,17 @@ export const walletsApi = {
 
     const { data } = await apiClient.post<{ id: string }>('/wallets', request);
     return walletsApi.getById(data.id);
+  },
+
+  archive: async (wallet: WalletView) => {
+    await apiClient.put(`/wallets/${wallet.id}`, {
+      name: wallet.name,
+      type: wallet.type === 'shared-household' ? 'sharedHousehold' : wallet.type,
+      currency: wallet.currency,
+      currentBalance: wallet.balance,
+      color: wallet.color,
+      icon: wallet.icon,
+      isArchived: true,
+    });
   },
 };

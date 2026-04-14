@@ -1,21 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../api/settings.api';
-
-type ProfilePayload = { fullName: string; email: string; language: string; timezone: string };
-type PreferencePayload = {
-  currency?: string;
-  defaultWalletId?: string;
-  salaryDay?: number;
-  dashboardCompactMode?: boolean;
-  householdDefaults?: string;
-};
-type NotificationSettingsPayload = {
-  reminderInApp?: boolean;
-  reminderEmail?: boolean;
-  sharedExpenseInApp?: boolean;
-  budgetWarningInApp?: boolean;
-  weeklyDigestEmail?: boolean;
-};
+import type {
+  NotificationSettingsValues,
+  PreferenceSettingsValues,
+  ProfileSettingsValues,
+} from '../types/settings.types';
 
 const key = ['settings'] as const;
 
@@ -30,7 +19,7 @@ export function usePreferenceSettings() {
 export function useSaveSettings(kind: 'profile' | 'preferences' | 'notifications') {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: ProfilePayload | PreferencePayload | NotificationSettingsPayload) => {
+    mutationFn: async (payload: ProfileSettingsValues | PreferenceSettingsValues | NotificationSettingsValues) => {
       if (kind === 'profile') return (await settingsApi.saveProfile(payload)).data;
       if (kind === 'notifications') return (await settingsApi.saveNotificationSettings(payload)).data;
       return (await settingsApi.savePreferences(payload)).data;
